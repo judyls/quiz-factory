@@ -373,8 +373,14 @@ agent's to write; these are the invariants it must satisfy.
   and for any 3, the clause showing the decision that changed.
 - The judge scores what was said, not what was probably meant. Charitable reconstruction of
   a vague answer is the main route to flattery.
-- Absence is band 0, not a missing value. `deep_dive_failure_modes = 0` on a scenario whose
-  whole point is overload is a real, reportable finding.
+- **Absence is band 0 only on an axis the item actually asked about.** In the 45-minute
+  mock all six axes are in scope, so `deep_dive_failure_modes = 0` on a scenario whose whole
+  point is overload is a real, reportable finding. In the 60-second diagnostic each item
+  scores exactly 2 axes and the other 4 were never asked: those are **not assessed**, and
+  the judge must emit an `assessed: false` flag rather than a 0. Scoring them 0 would feed
+  four spurious zeros per item into the axis aggregation, and the level mapping sends any
+  axis at 0 straight below the senior bar — so a strong candidate would be graded below bar
+  by arithmetic. Found while writing `prompts.md`; the mechanism is in Prompt 3.
 - The report's contrast section — what an at-bar answer to that same follow-up sounds like
   — is generated against `model_answer`, never against the candidate's own answer. Grading
   someone against a polished version of what they said is how a grader learns to flatter.

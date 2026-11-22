@@ -248,6 +248,14 @@ To the **build agent**: rubric as structured data (24 behavior cells), 40 scenar
 schema above, 12 open-response diagnostic items with axis mappings, grader + interviewer
 prompts, calibration report.
 
+**Delivered so far:** [`rubric.md`](rubric.md), [`questions.json`](questions.json) (the 12
+items), [`prompts.md`](prompts.md) (interviewer, diagnostic probe, grader, plus the
+code-enforced validation table), [`calibration-plan.md`](calibration-plan.md),
+[`calibration-plants.json`](calibration-plants.json) (12 grader fixtures) and
+[`dry-run-report.md`](dry-run-report.md). **Still owed:** the 40-scenario bank — which
+Prompt 1, the 45-minute mock interviewer, is blocked on — and the calibration numbers,
+which need live sessions.
+
 The diagnostic is **open spoken response**, which has two consequences the build agent owns:
 
 1. **A mic-permission prompt before question 1 would violate the hardest non-negotiable in
@@ -255,10 +263,13 @@ The diagnostic is **open spoken response**, which has two consequences the build
    box and offers voice as an upgrade; the text path stays first-class, not a fallback,
    because it is also what every user on a shared desk or a commute uses. The judge grades
    the transcript either way and must not reward spoken answers over typed ones.
-2. **The hard caps in `rubric.md` are code with tests, not prompt text**, and the ten
-   adversarial plants in `calibration-plan.md` belong in the test suite as fixtures. They
-   are regression tests on grader harshness and the cheapest protection against drift
-   toward flattery across prompt revisions.
+2. **The caps and gates are code with tests, not prompt text.** The authoritative list is
+   the validation table in [`prompts.md`](prompts.md) — one test per row, reject-and-re-ask
+   rather than silent repair, and log the rejection rate per check. The 12 adversarial
+   plants in [`calibration-plants.json`](calibration-plants.json) belong in the test suite
+   as fixtures: they are regression tests on grader harshness and the cheapest protection
+   against drift toward flattery across prompt revisions. Plant 08b is the one that tests
+   the relevance gate does not *over*-fire; the other eleven only test harshness.
 
 To the **GTM agent**: the 40 scenario slugs and titles, the rubric axes in plain language
 for public copy, and the calibration numbers — they are the strongest credibility claim the
