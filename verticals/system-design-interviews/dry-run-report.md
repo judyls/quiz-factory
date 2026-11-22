@@ -172,8 +172,9 @@ The dry run fixed three mechanical defects. It cannot touch any of these:
 5. **The level-mapping thresholds.** Still invented, still the highest-stakes unvalidated
    numbers in the pack.
 
-**One thing this exercise did change about the practitioner brief:** send them plants 03
-and 08 alongside the rubric. Plant 03 sits on the 2/3 boundary and plant 08 is the
+**One thing this exercise did change about the practitioner brief:** send them plants 03a,
+03b and 08 alongside the rubric. 03a and 03b bracket the 2/3 line from both sides, so
+practitioners test *where it sits* rather than one point near it. Plant 08 is the
 pattern-matcher. Asking two practitioners to score those two independently is a ten-minute
 task that tests the most load-bearing and most contestable judgements in the pack, and it
 can be done before anyone records a real session.
@@ -193,3 +194,20 @@ can be done before anyone records a real session.
   required clause makes band 3 easier to reach. If that turns out to be too easy — more
   than about 15% of axis scores landing at 3, per the distribution check in
   `calibration-plan.md` — the fix was wrong and the right answer was mock-only band 3.
+
+---
+
+## Addendum — plants 03 and 08 re-examined
+
+**Plant 03's expected score was wrong.** It asserted `capacity == 2`, but the band 2 cell
+requires naming the binding constraint, and plant 03 computes 40TB without ever saying
+memory binds — then picks the index the number rules out. A literal grader scores it 1, so
+the fixture would have failed a *correct* grader. The original "PASS" above was the
+hand-grader forgiving the missing clause, which is precisely the bias a self-graded dry run
+is prone to. Split into 03a (≤ 1) and 03b (== 2), and added the band-1 clause "derived the
+deciding number, then proposed a design it rules out".
+
+**Plant 08 holds, by two independent routes**: the relevance gate, and capacity band 1's
+"computed something irrelevant". Two gaps closed: the gate is now a judge output
+(`addresses_prompt`) clamped in code rather than a prompt instruction, and plant 08b tests
+that it does not fire on an on-problem answer that passes through a neighbouring topic.

@@ -70,6 +70,13 @@ against this rubric, because every clause in the cell was literally satisfied. O
 not score that axis. The judge must check the answer against the prompt's stated
 constraints before scoring any axis.
 
+**How it is enforced.** Per axis, the judge emits `addresses_prompt` (bool) and
+`prompt_constraint_engaged` — a verbatim quote from the *prompt* naming the constraint the
+answer's decision rests on. Code clamps the axis to ≤ 1 when `addresses_prompt` is false or
+the quoted constraint is not in the prompt. The gate tests the answer's **binding constraint
+and decision**, not its topic or vocabulary: a neighbouring scenario considered and rejected
+on the way to the right problem does not trigger it (plant 08b is the control).
+
 ### Composite and level mapping
 
 Axis scores are not averaged into a single number for the user-facing level claim. The
@@ -142,7 +149,7 @@ move the design. See [the departure note](#where-this-rubric-departs-from-its-so
 | Band | Observable behaviour |
 | --- | --- |
 | **0** | No quantity of any kind, in a scenario whose constraints were stated numerically. Chose between two options whose only real difference is a number, without computing either. |
-| **1** | Gave a number with no derivation, or off by >100× without noticing, or only after being asked twice. Computed something irrelevant (storage for a latency-bound problem). Recited a spec figure — 80GB of HBM, 3.35 TB/s [H100] — without using it in an arithmetic step. Used a number that contradicts a constraint stated in the prompt. |
+| **1** | Gave a number with no derivation, or off by >100× without noticing, or only after being asked twice. Computed something irrelevant (storage for a latency-bound problem). Recited a spec figure — 80GB of HBM, 3.35 TB/s [H100] — without using it in an arithmetic step. Used a number that contradicts a constraint stated in the prompt. Derived the number that decides the question, then proposed a design it rules out (computed 40TB raw, then chose an index that needs all of it resident) — the number was produced but not understood. |
 | **2** | Derived the binding quantity from assumptions stated out loud: request volume × payload, tokens/sec per GPU, KV bytes per token × context length, cost per million tokens. Arithmetic within ~2–3×. **Named which constraint binds** — memory capacity vs memory bandwidth vs compute vs network vs dollars — and showed why the others have slack. |
 | **3** | All of band 2, unprompted, **and the result changed the design**: the number ruled out an architecture, resized a fleet, moved a component, forced an admission-control policy, or revealed that the stated SLO is unachievable at the stated budget — and they said so. Stated assumptions as assumptions and flagged which one the answer is most sensitive to. Rounded in the conservative direction on purpose and said which direction that was. |
 
@@ -277,7 +284,7 @@ asked nicely to be harsh drifts generous within a few prompt revisions.
 | Rule | Why |
 | --- | --- |
 | No quantity **the candidate derived** ⇒ `capacity_cost_estimation ≤ 1` | The axis is unobservable otherwise. Not "no quantity in the transcript" — that is defeated by echoing the prompt's own numbers |
-| Behaviour performed on the **wrong problem** ⇒ that axis ≤ 1 | A correct answer to a different question is not partial credit |
+| Judge emits `addresses_prompt = false` (decision rests on a constraint not in the prompt) ⇒ code clamps that axis ≤ 1 | A correct answer to a different question is not partial credit |
 | No trade-off axis named ⇒ `tradeoff_articulation ≤ 1` | Pros-and-cons lists are band 1 [IIO-1] |
 | Any score of 3 requires a verbatim quote from the candidate | A 3 without evidence is the grader's opinion |
 | Every report carries ≥2 below-bar observations with quotes | Reports with no criticism are detected in one session |
