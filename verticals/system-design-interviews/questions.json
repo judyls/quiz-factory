@@ -1,0 +1,630 @@
+{
+  "_meta": {
+    "pack": "system-design-interviews",
+    "version": "0.1.0-unreviewed",
+    "authored": "2026-11-22",
+    "count": 12,
+    "status": "NOT PRACTITIONER-REVIEWED. See rubric.md and calibration-plan.md before shipping.",
+    "instrument": "Voice-captured open response, graded by the judge against rubric.md. NOT multiple choice.",
+    "schema_note": "Eight fields are the engine's existing schema: id, persona, track, prompt, terms, good, bad, model_answer. Two fields are additive extensions the build agent must confirm the loader tolerates: `axes` (required — without it there is no 6-axis scorecard, and the scorecard is the share artifact) and `followups` (the conditional probes that make the counterpart feel like an interviewer rather than a question-reader). Hard numeric constraints are baked into `prompt` text rather than a separate `constraints` field, so the prompt is self-contained and speakable.",
+    "answer_budget_seconds": 60,
+    "design_rules": [
+      "Every prompt states hard numbers and asks for exactly ONE decision plus its reason. A full 45-minute design cannot be answered in 60 seconds; a single load-bearing judgement call can.",
+      "Every model_answer contains at least one concrete number, with its derivation or its assumption stated out loud. A model answer without a number teaches the judge that vagueness scores 20.",
+      "Every `bad` is a real failure mode observed in the category, not an invented wrong answer. Several are failure modes the published interview guides name directly.",
+      "`terms` is diagnostic vocabulary, NOT a keyword scorer. Presence of a term is not credit; absence of all of them alongside a correct decision is a communication finding, not a knowledge finding. The judge must be instructed accordingly or it degrades into bingo.",
+      "Surface is AI infra. Substance is capacity math, queueing, backpressure, multi-tenancy, consistency. Say so on the public pages."
+    ],
+    "axis_coverage": {
+      "requirements_scoping": [
+        "kv-cache-admission-control",
+        "inline-safety-classifier-budget",
+        "eval-infra-per-commit-cost",
+        "annotation-throughput-vs-agreement"
+      ],
+      "capacity_cost_estimation": [
+        "batch-window-vs-ttft-budget",
+        "kv-cache-admission-control",
+        "heterogeneous-fleet-routing",
+        "vector-index-at-10b"
+      ],
+      "high_level_design": [
+        "multi-tenant-token-limiter-placement",
+        "streaming-delivery-and-deploys",
+        "heterogeneous-fleet-routing",
+        "training-data-dedup-and-shuffle"
+      ],
+      "deep_dive_failure_modes": [
+        "gpu-credit-ledger-consistency",
+        "streaming-delivery-and-deploys",
+        "training-data-dedup-and-shuffle",
+        "agent-retry-side-effects"
+      ],
+      "tradeoff_articulation": [
+        "batch-window-vs-ttft-budget",
+        "multi-tenant-token-limiter-placement",
+        "gpu-credit-ledger-consistency",
+        "vector-index-at-10b"
+      ],
+      "communication_collaboration": [
+        "inline-safety-classifier-budget",
+        "eval-infra-per-commit-cost",
+        "annotation-throughput-vs-agreement",
+        "agent-retry-side-effects"
+      ]
+    },
+    "sourcing_discipline": "No item claims that any named company asks any question. Reported frontier-lab themes (inference batching with explicit capacity math, GPU credit management, low-latency GPU inference with multi-tenancy and cost control) are documented in RESEARCH-NOTES.md as third-party reported, and are used here only to choose which categories to cover. Each item is representative of its category.",
+    "personas": {
+      "inference_lead": "Runs the hosted inference fleet. Cares about TTFT, utilisation, and the bill. Pushes on numbers.",
+      "platform_staff": "Staff engineer on the ML platform. Owns multi-tenancy and quota. Pushes on isolation and blast radius.",
+      "research_eng": "Research engineer who is the internal customer. Asks for things that are expensive. Pushes on why not.",
+      "reliability_eng": "On-call for the serving path. Pushes on partial failure, retries, and what the user sees when it breaks."
+    }
+  },
+  "questions": [
+    {
+      "id": "batch-window-vs-ttft-budget",
+      "persona": "inference_lead",
+      "track": "inference_serving",
+      "axes": [
+        "capacity_cost_estimation",
+        "tradeoff_articulation"
+      ],
+      "prompt": "We serve a 70-billion-parameter model on replicas of four H100s. Our p99 time-to-first-token target is 400 milliseconds. Right now we use a fixed batch size of 32: p99 time-to-first-token is sitting at 1.2 seconds, and the GPUs are only 45 percent utilised. Both numbers are bad at the same time. What do you change first, and what number tells you it worked?",
+      "terms": [
+        "continuous batching",
+        "static batching",
+        "batch window",
+        "prefill",
+        "decode",
+        "time to first token",
+        "inter-token latency",
+        "memory bandwidth bound",
+        "queueing delay",
+        "utilisation"
+      ],
+      "good": "Identifies that a fixed batch size makes latency depend on batch fill time rather than on work, so requests wait for the batch to fill while GPUs idle — which is exactly how both numbers get bad together. Moves to continuous batching, where the scheduler admits work per decode step instead of per batch. Sizes the batch *window* against the 400ms budget rather than picking a batch size. Separates prefill from decode scheduling, because a long prefill in the same step blocks every decode behind it. Names the trade-off in units: batch window versus time-to-first-token, or throughput versus tail latency, and picks a side given the stated 400ms. Says what to measure — p99 TTFT and inter-token latency as separate series, not one latency number.",
+      "bad": "Raises the batch size to improve utilisation. This is the real and common failure: it does raise utilisation and it makes the 1.2 second p99 worse, because with static batching the wait is the batch fill time. The underlying mistake is treating utilisation and latency as one dial. A second common form is 'autoscale the replicas' — which adds idle capacity to a problem caused by scheduling discipline, and does not change the fill time at all.",
+      "model_answer": "Both numbers are bad together because the batch is fixed, so a request's time-to-first-token is dominated by waiting for 31 neighbours, not by compute. I would switch to continuous batching and size the admission window against the budget instead of choosing a batch size. Rough math: 70 billion parameters in bfloat16 is 140 gigabytes of weights; across four H100s at 3.35 terabytes per second each, that is about 13 terabytes per second aggregate, so one decode step floors around 10 milliseconds — and that same 10 milliseconds serves the whole batch. So I can afford a window of roughly 20 to 25 milliseconds and still leave the 400 millisecond budget almost intact for prefill and queueing. The trade-off is explicit: a wider window buys throughput and spends tail latency, and at a 400 millisecond target I spend throughput. That flips if the budget is ever relaxed past about a second, or if long prompts grow past a fifth of traffic. I would watch p99 time-to-first-token and inter-token latency as two separate series.",
+      "followups": [
+        {
+          "if": "no number produced",
+          "probe": "Give me a number. How long does one decode step take on that hardware?"
+        },
+        {
+          "if": "says increase batch size",
+          "probe": "Utilisation goes up. What happens to the 1.2 second p99, and why?"
+        },
+        {
+          "if": "says autoscale",
+          "probe": "You have added two idle replicas and the p99 has not moved. Why not?"
+        },
+        {
+          "if": "at bar",
+          "probe": "Now 30 percent of traffic arrives with 100,000-token prompts. Does your window still hold?"
+        },
+        {
+          "if": "at bar",
+          "probe": "Halve the GPU budget. What breaks first — the 400 milliseconds or the throughput?"
+        }
+      ]
+    },
+    {
+      "id": "kv-cache-admission-control",
+      "persona": "inference_lead",
+      "track": "inference_serving",
+      "axes": [
+        "requirements_scoping",
+        "capacity_cost_estimation"
+      ],
+      "prompt": "Same 70-billion-parameter model, eight nodes of eight H100s. 95 percent of requests carry about 2,000 tokens of context; 5 percent carry about 100,000. At the daily peak, the long requests push the short ones out of cache and p99 time-to-first-token on the short traffic triples. Before you design anything: what exactly are you protecting, and what is the first number you would want?",
+      "terms": [
+        "KV cache",
+        "admission control",
+        "paged attention",
+        "preemption",
+        "eviction",
+        "head-of-line blocking",
+        "HBM capacity",
+        "context length",
+        "request class",
+        "SLO"
+      ],
+      "good": "Refuses to design until the thing being protected is named as a quantity: a time-to-first-token target for the 95 percent, and a separate, explicitly worse one for the long-context 5 percent — two request classes with two SLOs rather than one average. Asks for KV bytes per token, because that is what converts context length into a capacity number, and computes the long request's footprint. Recognises this as a capacity and admission problem, not a cache-tuning problem. States a scope cut out loud: the long-context class gets a worse guarantee on purpose, and says what that buys.",
+      "bad": "Treats it as an eviction-policy question and starts proposing LRU versus LFU for the KV cache. This is a real and attractive wrong turn — it is a cache, so cache instincts fire — but at these sizes no replacement policy helps, because a single 100,000-token request needs tens of gigabytes that simply are not there alongside the short traffic. The related failure is averaging the two classes into one p99 target, which makes the 5 percent invisible in the metric and the 95 percent unprotectable by policy.",
+      "model_answer": "What I am protecting is the 95 percent — say a 400 millisecond time-to-first-token target — and I want the long-context class explicitly held to a worse number, maybe two seconds, rather than hidden in a blended p99. The number I want first is KV bytes per token. For a 70B-class model, grouped-query attention with 8 key-value heads, 80 layers, head dimension 128, in bfloat16, that is 2 times 80 times 8 times 128 times 2 bytes, about 320 kilobytes per token. So one 100,000-token request is roughly 32 gigabytes of KV — against 80 gigabytes of HBM per card, most of which is already holding weights. That reframes the problem: this is admission control, not eviction. No replacement policy recovers 32 gigabytes. So I would partition capacity by request class, admit long-context requests against a reserved pool, and shed or queue them when it is full, which makes the degradation land on the class I have already agreed can be slower.",
+      "followups": [
+        {
+          "if": "no number produced",
+          "probe": "How much KV memory does one of those 100,000-token requests actually need?"
+        },
+        {
+          "if": "proposes an eviction policy",
+          "probe": "Which replacement policy frees 32 gigabytes on a card that is already full of weights?"
+        },
+        {
+          "if": "one SLO for all traffic",
+          "probe": "Your p99 is a blend of two classes. What does that metric tell you to do?"
+        },
+        {
+          "if": "at bar",
+          "probe": "Product says long-context is the premium tier and must be fast. Now what?"
+        },
+        {
+          "if": "at bar",
+          "probe": "What do you return to a rejected long-context request, and what does the client do with it?"
+        }
+      ]
+    },
+    {
+      "id": "multi-tenant-token-limiter-placement",
+      "persona": "platform_staff",
+      "track": "multi_tenancy_quota",
+      "axes": [
+        "high_level_design",
+        "tradeoff_articulation"
+      ],
+      "prompt": "A hosted API with 800 tenants. Each is sold 100,000 tokens per minute. Request shapes vary by roughly 100x — some tenants send 500-token requests thousands of times a minute, others send single requests with 100,000 tokens of context. Where does the rate limiter live, and what does it count?",
+      "terms": [
+        "token bucket",
+        "fair share",
+        "admission control",
+        "noisy neighbour",
+        "distributed rate limiting",
+        "gateway",
+        "scheduler",
+        "output tokens",
+        "quota ledger",
+        "isolation"
+      ],
+      "good": "Counts tokens, not requests — with 100x shape variance a request limiter provides no isolation at all. Notices that output tokens are not known at admission time, so the limiter must reserve against an estimate and reconcile on completion. Places the check at the gateway for cheap rejection and a second enforcement point at the scheduler, because the gateway cannot know queue depth. Names the trade-off in units: accuracy of the limit versus the latency of the check, or utilisation versus isolation, and picks a side. Observes that one 100,000-token request consumes an entire minute of a tenant's quota in a single call, which makes the limit itself the wrong shape and is worth saying to the product owner.",
+      "bad": "A requests-per-minute limiter at the gateway. This is the default thing to build and it fails specifically here: it is the limiter nearly every API starts with, and at 100x shape variance it lets one tenant consume orders of magnitude more compute than another while both appear compliant. The second real failure is a strongly consistent central counter in the hot path, which turns every request into a synchronous round trip to one shard and makes the limiter the availability bottleneck for the whole API.",
+      "model_answer": "It has to count tokens, because requests are not comparable here — 100x shape variance means a request limiter gives you no isolation. 100,000 tokens a minute is about 1,670 tokens a second, so one 100,000-token request spends a tenant's entire minute in a single call. Worth flagging to product: the quota as sold cannot express what a long-context tenant buys. The design follows from that number — a token bucket per tenant, enforced at the gateway so rejection is cheap, with per-node buckets holding leases from a central ledger and reconciling asynchronously. Output length is unknown at admission, so I reserve an estimate and settle on completion. The trade-off is precision against latency: strict global accounting is a synchronous hop per request and a single point of failure, so I take eventual accounting and a bounded few-percent overshoot. I would reverse that the day we sell paid overage, because then those few percent are revenue and the lease has to shrink toward 1,670 tokens. The ledger is what breaks first, so that is what I would load-test.",
+      "followups": [
+        {
+          "if": "counts requests",
+          "probe": "Tenant A sends 2,000 short requests, tenant B sends 10 long ones. Both are inside the limit. Who is using the fleet?"
+        },
+        {
+          "if": "proposes a central counter",
+          "probe": "That shard is now in the path of every request. What is your availability?"
+        },
+        {
+          "if": "no mention of output tokens",
+          "probe": "You do not know the output length at admission. What do you charge?"
+        },
+        {
+          "if": "at bar",
+          "probe": "One tenant is 40 percent of total traffic and is inside their limit. Is the system fair?"
+        },
+        {
+          "if": "at bar",
+          "probe": "Where is the overshoot bounded, and what is the worst case in dollars?"
+        }
+      ]
+    },
+    {
+      "id": "gpu-credit-ledger-consistency",
+      "persona": "platform_staff",
+      "track": "multi_tenancy_quota",
+      "axes": [
+        "deep_dive_failure_modes",
+        "tradeoff_articulation"
+      ],
+      "prompt": "An internal GPU credit system. 400 research teams, credits debited per GPU-second, and 20 schedulers admitting jobs. Jobs must start in under 2 seconds. A strongly consistent ledger check adds about 150 milliseconds to admission, which is affordable — but it also means the ledger is in the path of every job start. What consistency model do you pick, and what is the exposure if you are wrong?",
+      "terms": [
+        "lease",
+        "overdraft",
+        "eventual consistency",
+        "linearizable",
+        "idempotency",
+        "reconciliation",
+        "blast radius",
+        "double spend",
+        "quota ledger",
+        "graceful degradation"
+      ],
+      "good": "Picks leases: each scheduler draws a block of credits ahead of time and debits locally, so the ledger leaves the admission path entirely. Quantifies the exposure as the bound on overdraft — lease size times scheduler count — and converts it to dollars, which is what makes the choice obviously correct rather than merely fashionable. Names the real risk as the availability coupling, not the 150 milliseconds: a linearizable ledger in the path means no job in the company starts when that ledger is degraded. Says what happens on scheduler death (the lease is lost or reclaimed on a timer) and makes debits idempotent so reconciliation cannot double-charge.",
+      "bad": "Chooses strong consistency because credits are money and money needs transactions. This is a genuinely defensible-sounding answer and it is the common one, which is why it discriminates: it accepts a hard availability coupling for every job start across the company in exchange for preventing an overdraft that is worth a few dollars. The failure is not the consistency choice, it is never having sized the thing being protected. The opposite real failure is choosing eventual consistency without bounding the overdraft at all, which is the same mistake with a different outcome.",
+      "model_answer": "I would take leases and keep the ledger out of the admission path. Each of the 20 schedulers holds a lease of, say, 1,000 GPU-seconds, debits locally, and reconciles asynchronously. The worst-case overdraft is then bounded and computable: 20 schedulers times 1,000 GPU-seconds is 20,000 GPU-seconds, about 5.6 GPU-hours, which at roughly 2 dollars a GPU-hour is on the order of 11 dollars. I am trading 11 dollars of possible overspend for removing a hard dependency from every job start in the company — and that is the real exposure, not the 150 milliseconds. A linearizable ledger in the path means that when it degrades, nobody's research runs. If the number came out at 11,000 dollars instead of 11, I would shrink the lease, not change the model. Debits need idempotency keys so reconciliation cannot double-charge, and leases need a timeout so a dead scheduler's credits come back.",
+      "followups": [
+        {
+          "if": "chooses strong consistency",
+          "probe": "What is the overdraft worth in dollars if you are wrong? Compare it to the cost of the ledger being down for an hour."
+        },
+        {
+          "if": "chooses eventual with no bound",
+          "probe": "How far negative can a team go before you notice?"
+        },
+        {
+          "if": "no mention of scheduler failure",
+          "probe": "A scheduler dies holding a lease. Where did those credits go?"
+        },
+        {
+          "if": "at bar",
+          "probe": "Finance wants a per-team invoice that reconciles to the cent. Does your design survive that?"
+        },
+        {
+          "if": "at bar",
+          "probe": "What is the first signal that reconciliation is silently wrong?"
+        }
+      ]
+    },
+    {
+      "id": "streaming-delivery-and-deploys",
+      "persona": "reliability_eng",
+      "track": "request_path",
+      "axes": [
+        "high_level_design",
+        "deep_dive_failure_modes"
+      ],
+      "prompt": "60,000 concurrent streaming sessions. A typical answer streams for about 90 seconds. Mobile clients drop their connection at roughly 4 percent per minute. We deploy about six times a day. Pick your transport, and tell me what happens to an in-flight stream when a node goes away mid-generation.",
+      "terms": [
+        "server-sent events",
+        "WebSocket",
+        "resumption token",
+        "sticky session",
+        "connection draining",
+        "idempotency",
+        "partial response",
+        "backpressure",
+        "cursor",
+        "at-least-once"
+      ],
+      "good": "Picks SSE for a one-directional token stream and gives a reason tied to this system (simpler, works over plain HTTP, reconnection semantics are built in) rather than a general preference. Does the reconnection arithmetic: at 4 percent per minute over a 90-second answer, a meaningful fraction of streams break, so resumption is a core requirement rather than an edge case. Designs resumption explicitly — a token index or cursor the client sends back, with generated tokens buffered server-side so a reconnect resumes rather than restarts. Addresses deploys as the same failure, not a separate one: connection draining, and generation state that outlives the process holding the socket. Names what the user sees in the unrecoverable case.",
+      "bad": "Picks WebSocket for bidirectional capability it does not need, then adds sticky sessions to make it work — which couples every in-flight stream to one process and makes six deploys a day into six waves of broken streams. The deeper and more common failure is treating reconnection as a client retry that restarts generation: the user pays twice, waits twice, and on a side-effecting or billed path is charged twice. Not buffering generated tokens server-side is the specific omission that forces this.",
+      "model_answer": "Server-sent events. The stream is one-directional, it is plain HTTP so proxies and mobile networks handle it, and reconnection is part of the protocol. The arithmetic forces the real design: 4 percent a minute over a 90-second answer means roughly 6 percent of streams break mid-generation, which at 60,000 concurrent is thousands of resumptions at any moment. So resumption is the feature, not an edge case. I buffer generated tokens server-side against a stream ID and have the client reconnect with the index of the last token it saw, so it resumes instead of regenerating — otherwise the user waits twice and, on a billed path, pays twice. Deploys are the same failure at larger scale: six a day means generation state cannot live in the process holding the socket, so I keep it in the inference service with the socket as a thin reader, and drain connections rather than cutting them. If the buffer has expired, the client gets an explicit restart signal rather than silence.",
+      "followups": [
+        {
+          "if": "picks WebSocket",
+          "probe": "What do you need the upstream channel for in a token stream?"
+        },
+        {
+          "if": "proposes sticky sessions",
+          "probe": "You deploy six times a day. What happens to the sticky sessions?"
+        },
+        {
+          "if": "reconnect restarts generation",
+          "probe": "The user has seen 400 tokens and reconnects. Do they see them again, and who pays for them?"
+        },
+        {
+          "if": "at bar",
+          "probe": "How long do you hold the buffer, and what does that cost at 60,000 concurrent?"
+        },
+        {
+          "if": "at bar",
+          "probe": "The client is a server-side integration, not a browser. Does anything change?"
+        }
+      ]
+    },
+    {
+      "id": "inline-safety-classifier-budget",
+      "persona": "inference_lead",
+      "track": "request_path",
+      "axes": [
+        "requirements_scoping",
+        "communication_collaboration"
+      ],
+      "prompt": "Policy says a safety classifier runs on every request. It costs 40 milliseconds at p50 and 180 at p99. Our time-to-first-token budget is 400 milliseconds and we are already at 310 at p99. Your tech lead says: just run it asynchronously and retract anything bad after the fact. You disagree. Say what you would say to them.",
+      "terms": [
+        "latency budget",
+        "critical path",
+        "prefill overlap",
+        "fail-closed",
+        "fail-open",
+        "requirement",
+        "p99",
+        "speculative execution",
+        "blocking",
+        "retraction"
+      ],
+      "good": "Engages the actual proposal rather than restating policy: asynchronous classification means tokens the classifier would have blocked have already been delivered to the user, so retraction is not a mitigation, it is a different product decision with a different risk owner. Then does the arithmetic that makes the disagreement concrete — 310 plus 180 does not fit in 400 — and so concedes the real point: the classifier does not fit on the critical path as currently built either. Proposes a third option rather than a stalemate: classify the prompt during prefill so the cost overlaps work already happening, or classify the first tokens before flush. Names the fail-open versus fail-closed decision and says who owns it. Keeps the register collaborative — it is a tech lead, not an adversary.",
+      "bad": "Wins the argument on policy — 'we have to, it is required' — without addressing that the budget does not close either way. This is a real failure mode and specifically a communication one: the person is technically right, is heard as inflexible, and leaves with no design. The other real failure is agreeing too fast and taking the async path without ever naming that someone is now accepting delivered-then-retracted unsafe output, which is a decision a tech lead cannot unilaterally make.",
+      "model_answer": "I would start by agreeing with the part they are right about. We are at 310 at p99 with 90 milliseconds of headroom and the classifier wants 180, so it does not fit on the critical path as things stand — the budget is already the problem. Where I disagree is on what async buys. If the classifier runs after we flush, the tokens it would have blocked are already on the user's screen, so retraction is not a mitigation, it is a different policy, and it is not ours to choose unilaterally. So I would propose a third thing: classify the prompt during prefill, which for a 2,000-token prompt is already hundreds of milliseconds of work we are paying for, so most of the 40 milliseconds overlaps and costs us almost nothing in wall clock. That covers the input case. For output we gate only the first flush. And I would make the fail-open versus fail-closed call explicit and take it to whoever owns the policy, rather than deciding it in this conversation.",
+      "followups": [
+        {
+          "if": "argues from policy only",
+          "probe": "I agree it is required. The budget still does not close. What is your design?"
+        },
+        {
+          "if": "accepts async immediately",
+          "probe": "A user has now seen 200 tokens we would have blocked. Who signed off on that?"
+        },
+        {
+          "if": "no number produced",
+          "probe": "Does 180 milliseconds fit in the budget or not? Show me."
+        },
+        {
+          "if": "at bar",
+          "probe": "The classifier is down. Do you serve or refuse, and who decides?"
+        },
+        {
+          "if": "at bar",
+          "probe": "Prompt classification is clean but the output turns unsafe at token 500. What did your design buy?"
+        }
+      ]
+    },
+    {
+      "id": "heterogeneous-fleet-routing",
+      "persona": "inference_lead",
+      "track": "inference_serving",
+      "axes": [
+        "capacity_cost_estimation",
+        "high_level_design"
+      ],
+      "prompt": "Three models in production: 8 billion, 70 billion, and 400 billion parameters, on a mixed fleet of A100s and H100s. Finance has given you a blended ceiling of one dollar fifty per million output tokens. Offline evaluation says about 70 percent of current traffic would be served acceptably by the 8-billion model. How do you route, and what do you measure to know you have not quietly made the product worse?",
+      "terms": [
+        "model routing",
+        "cascade",
+        "cost per million tokens",
+        "blended cost",
+        "memory bandwidth",
+        "quality regression",
+        "shadow traffic",
+        "confidence threshold",
+        "fallback",
+        "utilisation"
+      ],
+      "good": "Derives the cost ratio from first principles rather than guessing: decode cost per token tracks bytes of weights read, so the 8B model is roughly an order of magnitude cheaper per token than the 70B. Computes the blended figure for a 70/30 split and compares it to the 1.50 ceiling, so the routing decision is made against a number. Designs the router as a cheap classifier or a cascade with an escalation path, and is explicit that the escalation rate is the cost control knob. The measurement answer is the discriminating part: the thing to watch is per-segment quality and escalation rate, not aggregate quality, because a 70 percent-correct router can hold average quality flat while destroying one segment. Proposes shadow traffic before a cutover.",
+      "bad": "Routes on prompt length or another cheap proxy for difficulty, and measures aggregate quality. Both halves are real: length is the proxy everyone reaches for and it correlates weakly with the difficulty of the response, and aggregate quality is the metric that hides the damage, because the 30 percent of traffic that was misrouted is averaged against the 70 percent that was fine. The other common failure is pricing the models by list price per token rather than by what the fleet actually costs, which makes the ceiling unverifiable.",
+      "model_answer": "First the cost shape, because it sets how hard the router has to work. Decode is memory-bandwidth bound, so cost per token roughly tracks weight bytes read: the 8B model is about an order of magnitude cheaper per token than the 70B, and the 400B is several times worse again. If I serve 70 percent on the small model, blended cost falls to roughly 0.7 times a tenth plus 0.3 times one — about 37 percent of serving everything on the 70B. That tells me the dollar fifty ceiling is reachable, with room to spare. So: route with a small cheap classifier, cascade to the larger model on low confidence, and treat the escalation rate as the cost dial. The measurement is where I would be careful — quality per traffic segment and escalation rate, not aggregate quality, because a router that is 70 percent right can hold the average flat while making one segment much worse. I would shadow it before cutting over.",
+      "followups": [
+        {
+          "if": "no number produced",
+          "probe": "What is the blended cost per million tokens under your routing? Is it under the ceiling?"
+        },
+        {
+          "if": "routes on prompt length",
+          "probe": "A 30-token prompt asks for a proof. A 3,000-token prompt asks for a summary. Which model does each get?"
+        },
+        {
+          "if": "measures aggregate quality",
+          "probe": "Average quality is flat and support tickets are up 40 percent. What happened?"
+        },
+        {
+          "if": "at bar",
+          "probe": "The router itself adds 30 milliseconds. Where does that come from in the budget?"
+        },
+        {
+          "if": "at bar",
+          "probe": "Finance halves the ceiling. What do you change — the split, the models, or the product?"
+        }
+      ]
+    },
+    {
+      "id": "eval-infra-per-commit-cost",
+      "persona": "research_eng",
+      "track": "eval_observability",
+      "axes": [
+        "requirements_scoping",
+        "communication_collaboration"
+      ],
+      "prompt": "I am a research engineer and I want 50,000 graded evaluations on every commit. We land about 40 commits a day. Each evaluation is one 2,000-token generation plus a judge call. I want results in under 10 minutes so it can gate merges. Tell me what that costs, and tell me what you would push back on.",
+      "terms": [
+        "throughput",
+        "GPU-hours",
+        "caching",
+        "sampling",
+        "gating",
+        "sharding",
+        "flake rate",
+        "cost attribution",
+        "merge queue",
+        "requirement negotiation"
+      ],
+      "good": "Produces the capacity number before the opinion, because the number is the argument: 50,000 evaluations times 2,000 tokens in 600 seconds is a sustained token rate that implies a specific fleet size, and that fleet size times 40 commits a day is a specific daily bill. Then pushes back on the requirement rather than the implementation: the 10-minute gate on every commit is the expensive clause, and it is the one that was never costed. Offers the cheaper shapes — sample on commit and run the full suite on merge, cache results keyed by anything the commit did not change, shard and early-abort on a decisive subset. Treats the researcher as a customer whose goal is real: asks what decision the gate is meant to make, because a flake-prone gate blocking 40 merges a day is worse than no gate. Keeps the register collaborative rather than obstructive.",
+      "bad": "Says yes and builds it, or says no on cost without ever producing the number. Both are real and both are communication failures more than engineering ones. The specific technical failure under the 'yes' is not asking about the flake rate: at 50,000 evaluations per commit, even a very small nondeterministic failure rate means the gate blocks merges constantly, the team learns to override it, and the expensive infrastructure is then load-bearing for nothing.",
+      "model_answer": "Let me cost it before I argue with it. 50,000 evaluations at 2,000 tokens each is 100 million tokens in 600 seconds — about 170,000 tokens a second sustained. A four-H100 replica serving a 70B model does on the order of 6,000 tokens a second, so roughly 28 replicas, about 112 GPUs, for ten minutes per commit, plus the judge calls. At around 2 dollars a GPU-hour that is roughly 37 dollars a commit, so 1,500 dollars a day — about half a million a year for the gate alone. What I would push back on is not the 50,000, it is the 'every commit, in 10 minutes, gating merges' clause, which is nearly all of the cost. I would sample a few thousand on commit, run the full suite on merge, and cache by content hash. Before any of that: what is your flake rate? At 50,000 runs a slightly nondeterministic gate will block you constantly and you will start overriding it.",
+      "followups": [
+        {
+          "if": "no number produced",
+          "probe": "How many GPUs, and what does it cost a day? I need a figure to take to my lead."
+        },
+        {
+          "if": "refuses on cost without a number",
+          "probe": "You may be right, but I cannot act on 'expensive'. What is the figure?"
+        },
+        {
+          "if": "agrees to build as specified",
+          "probe": "What is our flake rate, and what happens to the merge queue when the gate trips?"
+        },
+        {
+          "if": "at bar",
+          "probe": "I will take sampling on commit. How do you pick the sample so it is not useless?"
+        },
+        {
+          "if": "at bar",
+          "probe": "Who gets billed for this, and can you attribute it per team?"
+        }
+      ]
+    },
+    {
+      "id": "annotation-throughput-vs-agreement",
+      "persona": "research_eng",
+      "track": "training_data",
+      "axes": [
+        "requirements_scoping",
+        "communication_collaboration"
+      ],
+      "prompt": "Our preference-data pipeline produces 200,000 human comparisons a month with 120 annotators. Inter-annotator agreement is a Cohen's kappa of 0.62. A VP asks why we cannot just double the annotator pool and get 400,000. You have about 30 seconds and they are not an ML person.",
+      "terms": [
+        "inter-annotator agreement",
+        "Cohen's kappa",
+        "label noise",
+        "throughput",
+        "gold set",
+        "adjudication",
+        "guideline revision",
+        "effective sample size",
+        "signal to noise",
+        "onboarding ramp"
+      ],
+      "good": "Answers in the VP's units — months, money, and whether the model gets better — not in ML vocabulary. Translates kappa 0.62 into a plain statement: on a meaningful share of comparisons two trained annotators disagree, so some fraction of the data is noise, and doubling the pool doubles the noise alongside the signal. Makes the leverage argument quantitatively: raising agreement is worth more than raising volume, because effective sample size depends on both. Does not simply say no — gives the sequence (fix guidelines and adjudication against a gold set, then scale) with a rough timeline. Notes the second-order cost: 120 new annotators dilute agreement further during onboarding, so the first effect of doubling is that quality drops.",
+      "bad": "Explains Cohen's kappa to the VP. This is the real and extremely common failure — it is accurate, it is responsive, and it loses the room, which on this axis is the whole measurement. The engineering failure underneath is accepting the framing that volume is the constraint: the team doubles headcount, agreement falls further because the new cohort is unramped, and the extra data does not move the model, which is then read as the data strategy having failed.",
+      "model_answer": "We can double the pool, but I do not think we would get double the useful data, and I would rather spend the headcount somewhere better. Right now, when two of our trained annotators look at the same comparison, they disagree often enough that a real slice of what we collect is closer to coin-flip than signal. Doubling the team doubles both the signal and the noise, so the model sees maybe 200,000 comparisons' worth of usable preference even though we paid for 400,000 — and for the first couple of months it would be worse than that, because 120 new annotators are unramped and would pull agreement down further. What I would do instead is spend about six weeks tightening the guidelines and adjudicating against a gold set. If we lift agreement meaningfully, every comparison we already collect gets more valuable, including the 200,000 a month we have today. Then doubling the pool is worth doing, and I would come back and ask for it.",
+      "followups": [
+        {
+          "if": "explains kappa",
+          "probe": "I do not know what that is. Tell me in terms of whether the model gets better."
+        },
+        {
+          "if": "accepts doubling",
+          "probe": "We doubled it and the model did not move. What do I tell my boss?"
+        },
+        {
+          "if": "no timeline given",
+          "probe": "How long does your alternative take, and what do I get at the end?"
+        },
+        {
+          "if": "at bar",
+          "probe": "What agreement number would make you comfortable scaling?"
+        },
+        {
+          "if": "at bar",
+          "probe": "Could a model do the first pass and humans only adjudicate? What breaks?"
+        }
+      ]
+    },
+    {
+      "id": "training-data-dedup-and-shuffle",
+      "persona": "platform_staff",
+      "track": "training_data",
+      "axes": [
+        "high_level_design",
+        "deep_dive_failure_modes"
+      ],
+      "prompt": "A 4-petabyte training corpus. It needs deduplication and a global shuffle, 2,000 GPUs will read it during training, and a run has to be reproducible down to the exact batch six months later. The dedup job currently takes nine days and nobody trusts the shuffle. What breaks first, and what do you fix first?",
+      "terms": [
+        "content addressing",
+        "manifest",
+        "shard",
+        "global shuffle",
+        "near-duplicate",
+        "MinHash",
+        "deterministic seed",
+        "checkpoint",
+        "read bandwidth",
+        "reproducibility"
+      ],
+      "good": "Separates the three requirements, because they fail for different reasons and one of them is cheap: reproducibility is not a data-processing problem at all, it is a manifest and seed problem, and it is fixable in days rather than weeks. Says what reproducibility actually requires — content-addressed immutable shards plus a recorded manifest, seed, and ordering function — so the same batch sequence can be regenerated without storing it. Treats the shuffle as an I/O budget rather than an algorithm: a global shuffle of 4 petabytes means moving 4 petabytes, which bounds how often it can be done, so shuffling once into shards plus cheap in-shard shuffling per epoch is the design. Does the read-bandwidth arithmetic for 2,000 readers. Names the trust problem as a verification gap and proposes a measurable check rather than a better algorithm.",
+      "bad": "Optimises the nine-day dedup job first, because it is the biggest visible number. It is the wrong first move: dedup runs once per corpus version, nine days is survivable, and meanwhile the untrusted shuffle and the missing reproducibility are silently contaminating every run and every comparison between runs. The specific technical failure is implementing the shuffle as a per-epoch global operation, which quietly requires moving petabytes every epoch and is the usual reason a data pipeline cannot keep 2,000 GPUs fed.",
+      "model_answer": "These are three requirements with three different failure modes, and the nine days is the least urgent of them. Reproducibility is the cheapest and most valuable fix: content-address the shards so they are immutable, then record the manifest, the seed, and the ordering function with the run. That regenerates the exact batch sequence six months later without storing it, and it is days of work, not weeks. Second, the shuffle. A true global shuffle of 4 petabytes means writing 4 petabytes — at even 100 gigabytes a second of sustained I/O that is on the order of 11 hours, so it is not something you do every epoch. I would shuffle once into shards at ingest and do cheap in-shard shuffling plus shard-order randomisation per epoch, which is where the trust problem probably comes from: nobody has measured the resulting distribution. I would add a verification job that samples it. Dedup I would leave at nine days and move it off the critical path, because it runs once per corpus version, not once per run.",
+      "followups": [
+        {
+          "if": "optimises dedup first",
+          "probe": "How often does dedup run compared to how often you train?"
+        },
+        {
+          "if": "proposes a per-epoch global shuffle",
+          "probe": "How many bytes does that move per epoch, and how long does it take?"
+        },
+        {
+          "if": "reproducibility via storing batches",
+          "probe": "How much storage is that for a run, and for the 40 runs you compare?"
+        },
+        {
+          "if": "at bar",
+          "probe": "A shard is found to be corrupt three months after the run. What can you say about the run?"
+        },
+        {
+          "if": "at bar",
+          "probe": "2,000 GPUs are at 60 percent utilisation waiting on data. Where is the bottleneck?"
+        }
+      ]
+    },
+    {
+      "id": "vector-index-at-10b",
+      "persona": "platform_staff",
+      "track": "retrieval_agents",
+      "axes": [
+        "capacity_cost_estimation",
+        "tradeoff_articulation"
+      ],
+      "prompt": "Retrieval over 10 billion embeddings at 1,024 dimensions, stored as float32. The p99 budget for the retrieval step is 50 milliseconds, recall at 10 must stay at or above 0.9, and about 200 million vectors change every day. Pick an index and tell me what the choice costs you.",
+      "terms": [
+        "product quantization",
+        "IVF",
+        "HNSW",
+        "recall at k",
+        "approximate nearest neighbour",
+        "memory footprint",
+        "index rebuild",
+        "incremental ingest",
+        "reranking",
+        "sharding"
+      ],
+      "good": "Starts with the memory number, because it eliminates most of the option space immediately: 10 billion times 1,024 times 4 bytes is tens of terabytes, which cannot sit in RAM at any sane cost, so the choice is really about what to compress and what to recover. Picks a quantized index — product quantization over an inverted-file structure — computes the compressed footprint, and shows it now fits across a modest cluster. Names the trade-off in units rather than in adjectives: compression ratio against recall, and recovers the lost recall with a reranking pass over full-precision vectors for the top candidates, which spends part of the 50 millisecond budget on purpose. Handles the 2 percent daily churn as an architectural requirement, not an afterthought: incremental additions into a small live segment plus periodic merges, because a full rebuild at this size cannot keep a daily cadence.",
+      "bad": "Picks HNSW because it has the best recall-latency curve in the benchmarks. This is the most defensible-looking wrong answer in the set and it is a real mistake: HNSW's graph plus full-precision vectors at this scale needs tens of terabytes of RAM, and it handles high deletion and update churn poorly, so the 200 million daily changes degrade it. The second real failure is quantizing hard enough to fit, never measuring recall at 10, and discovering in production that retrieval quality fell below the 0.9 floor — the number was in the requirements and never checked.",
+      "model_answer": "The memory number decides this. 10 billion vectors at 1,024 dimensions in float32 is about 40 terabytes raw, so nothing that needs full-precision vectors resident is affordable — that rules out a plain HNSW graph, which would also suffer with 200 million changes a day. So: an inverted-file index with product quantization. At roughly 64 bytes a vector after quantization that is about 640 gigabytes, which fits across ten or so machines with room for the coarse centroids. The cost is recall: aggressive quantization loses exactly the thing the 0.9 floor protects. So I spend part of the budget buying it back — retrieve a few hundred candidates from the compressed index, then rerank them against full-precision vectors fetched from disk or a cache, which is a small enough set to afford inside 50 milliseconds. For the churn, 200 million a day is about 2 percent, so I would write new vectors into a small live segment searched alongside the main index and merge periodically, because a full rebuild cannot run daily at this size.",
+      "followups": [
+        {
+          "if": "no number produced",
+          "probe": "How much memory does the raw set need? Does your index fit on one machine?"
+        },
+        {
+          "if": "picks HNSW",
+          "probe": "What is the resident memory for that graph at 10 billion vectors, and what do 200 million daily deletions do to it?"
+        },
+        {
+          "if": "no recall measurement",
+          "probe": "You compressed 60-fold. What is recall at 10 now, and how do you know?"
+        },
+        {
+          "if": "at bar",
+          "probe": "A full rebuild takes 30 hours and you have daily churn. What is your freshness guarantee?"
+        },
+        {
+          "if": "at bar",
+          "probe": "Halve the machine budget. Do you give up recall or latency?"
+        }
+      ]
+    },
+    {
+      "id": "agent-retry-side-effects",
+      "persona": "reliability_eng",
+      "track": "retrieval_agents",
+      "axes": [
+        "deep_dive_failure_modes",
+        "communication_collaboration"
+      ],
+      "prompt": "An agent fans out to 12 tools per turn. Some have side effects — one sends email, one charges a card. p99 tool latency is 8 seconds and each tool times out about 2 percent of the time. Today, when any tool times out, the orchestrator retries the whole turn. A teammate's fix is to add retries at the tool layer instead. Where is the actual bug, and what do you say to them?",
+      "terms": [
+        "idempotency key",
+        "at-least-once",
+        "exactly-once",
+        "retry amplification",
+        "partial failure",
+        "timeout budget",
+        "compensating action",
+        "duplicate side effect",
+        "fan-out",
+        "circuit breaker"
+      ],
+      "good": "Computes the compound failure probability, which is the move that reframes the whole conversation: with 12 tools at 2 percent each, something times out on roughly a fifth of all turns, so this is the normal path, not an edge case. Locates the bug correctly: retrying the whole turn re-executes side effects, so at that rate a meaningful share of turns send duplicate email or double-charge — and that is a correctness bug, not a reliability one. Says why tool-layer retries do not fix it and partly make it worse: a timeout does not tell you whether the call completed, so retrying a charge without an idempotency key charges twice, and retries at two layers multiply. The fix is idempotency keys per logical operation plus a timeout budget, with retries only on operations that are safe or made safe. Handles the teammate's proposal by crediting the part that is right (whole-turn retry is wrong) before disagreeing on the fix.",
+      "bad": "Adds retries at the tool layer, which is the teammate's proposal and is genuinely tempting because it is more targeted than retrying the turn. It does not address that a timed-out charge may have succeeded, so the retry double-charges, and retries at both the tool and orchestrator layers multiply into retry amplification against a dependency that is probably already slow for a reason. The other real failure is treating a 2 percent per-tool timeout rate as rare and not multiplying it by 12.",
+      "model_answer": "Multiply it out first: 12 tools at 2 percent each means something times out on about 21 percent of turns — one in five. So whole-turn retry is not a rare path, it is the normal path, and the actual bug is that it re-executes side effects. At that rate we are duplicating emails and double-charging cards routinely. That is a correctness bug, not a reliability one. I would tell my teammate they are right that whole-turn retry has to go, but tool-layer retries do not fix the thing that is hurting us: a timeout tells you nothing about whether the call completed, so retrying a charge just charges again, and retries at two layers multiply against a dependency that is already slow. What I want is an idempotency key per logical operation, generated once per turn, so a retry at any layer is a no-op if the first attempt landed. Then a shared timeout budget across the fan-out, retries only on read-only or idempotent calls, and a compensating action for the ones we cannot make idempotent.",
+      "followups": [
+        {
+          "if": "no number produced",
+          "probe": "How often does at least one of the 12 time out? Work it through."
+        },
+        {
+          "if": "proposes tool-layer retries",
+          "probe": "The charge call timed out. Did it charge? What does your retry do?"
+        },
+        {
+          "if": "treats it as a rare edge case",
+          "probe": "One in five turns hits this. Is it still an edge case?"
+        },
+        {
+          "if": "at bar",
+          "probe": "The email provider has no idempotency support. Now what?"
+        },
+        {
+          "if": "at bar",
+          "probe": "How would you have caught this in production before finance did?"
+        }
+      ]
+    }
+  ]
+}

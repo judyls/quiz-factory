@@ -1,0 +1,147 @@
+{
+  "_meta": {
+    "purpose": "Ten adversarial plants: fake candidate answers, each engineered to exploit ONE specific way a grader goes wrong. The correct score is known by construction, so each is a unit test with a pass/fail rather than a judgement call. Realistic answers cannot test a grader, because nobody knows their correct score — that is what calibration is for.",
+    "authored": "2026-11-22",
+    "status": "Graded by hand in dry-run-report.md. NOT yet run against a real grader — the grader does not exist.",
+    "usage": "Build agent: these belong in the test suite as fixtures. They are regression tests on grader harshness and the cheapest protection against drift toward flattery across prompt revisions. A failed plant is a defect, not a score.",
+    "grading_note": "Only the axes the target question scores are asserted. A plant may demonstrate excellent work on an axis that question does not measure; that earns nothing, by design, because each item scores exactly 2 of the 6 axes.",
+    "transcript_format": "A list of turns. `speaker` is `candidate` or `interviewer`. Multi-turn plants exist to test pushback handling, which cannot be observed in a monologue."
+  },
+
+  "plants": [
+    {
+      "id": "plant-01-confident-and-empty",
+      "targets": "batch-window-vs-ttft-budget",
+      "attacks": "The capacity hard cap. A fluent, well-structured, correct-sounding answer containing no quantity the candidate derived. If this scores 2+ on capacity, the cap is not enforced in code.",
+      "transcript": [
+        {"speaker": "candidate", "text": "So the issue here is that static batching couples latency to batch fill time rather than to actual work. I would move to continuous batching, so the scheduler admits requests at each decode step instead of waiting for a full batch to assemble. I would also separate prefill from decode scheduling, because a long prefill in the same step blocks every decode queued behind it. The trade-off is latency against throughput: a wider batch window buys you utilisation and spends time-to-first-token. Given our 400 millisecond target I would bias toward latency. Then I would tune the window empirically, watch the p99, and iterate until both numbers look healthy. I would also want solid observability on queue depth so we can see where the time is actually going."}
+      ],
+      "required_outcome": {
+        "capacity_cost_estimation": "<= 1",
+        "tradeoff_articulation": "may reach 2 — the axis IS named explicitly and a side IS picked. Axis independence is part of the test: an empty answer on one axis must not drag down a genuinely at-bar answer on another."
+      },
+      "known_defect_probed": "The answer echoes '400 millisecond' from the prompt. If the cap is implemented as 'no quantity in the transcript', it does not fire and the plant passes a broken grader. The cap must test for a quantity the candidate DERIVED."
+    },
+    {
+      "id": "plant-02-pros-and-cons-no-decision",
+      "targets": "gpu-credit-ledger-consistency",
+      "attacks": "The tradeoff cap and the band 1/2 boundary. Articulates both sides better than most at-bar candidates and never picks. The published guides name failure-to-decide as a common real failure.",
+      "transcript": [
+        {"speaker": "candidate", "text": "There are really two options here. Strong consistency gives you an authoritative ledger: no double-spend, finance can reconcile to the cent, and the 150 milliseconds is affordable against a 2-second start budget. The downside is that you have put the ledger in the path of every job start, so its availability becomes your availability. Eventual consistency with leases takes the ledger out of the hot path and gives you much better isolation, but you accept some overdraft, reconciliation gets more complex, and you have to handle a scheduler dying while holding a lease. Both are genuinely defensible. It really depends on how much the organisation cares about precise accounting versus uptime, and I would want to talk to finance and the platform team before committing either way."}
+      ],
+      "required_outcome": {
+        "tradeoff_articulation": "<= 1",
+        "deep_dive_failure_modes": "<= 1 — the lease-holder death is named generically and dropped, which is the band 1 definition"
+      },
+      "known_defect_probed": "The cap ('no trade-off axis named explicitly => <= 1') does NOT fire here: the axis IS named, as precise accounting versus uptime. Only the band 2 cell's requirement to pick catches this. Tests that the grader reads the cell and does not rely on the cap alone."
+    },
+    {
+      "id": "plant-03-number-salad",
+      "targets": "vector-index-at-10b",
+      "attacks": "The band 2/3 boundary on capacity. Every number is correct and correctly derived, and not one of them bears on the decision that follows. Must score exactly 2 — not 1, because the derivation is real; not 3, because nothing changed.",
+      "transcript": [
+        {"speaker": "candidate", "text": "Let me size it first. 10 billion vectors at 1,024 dimensions in float32 is 4 kilobytes per vector, so about 40 terabytes raw. Our p99 budget is 50 milliseconds and we need recall at 10 of at least 0.9. 200 million vectors change daily, which is about 2 percent churn. Given the recall requirement I would use HNSW, because it has the best recall-latency curve of the ANN families — typically 0.95-plus recall at single-digit millisecond latency. I would set M to 32 and efConstruction to 200, then tune efSearch to land inside the 50 millisecond budget. We would shard across machines and replicate for availability."}
+      ],
+      "required_outcome": {
+        "capacity_cost_estimation": "== 2 exactly",
+        "tradeoff_articulation": "<= 1 — picked on a one-sided benchmark claim, named no axis, acknowledged no cost"
+      },
+      "known_defect_probed": "This is the hardest cell in the rubric to grade and the most important. The candidate computed 40TB and then chose an index that cannot fit in 40TB of RAM. A grader that rewards the presence of correct arithmetic will give this a 3."
+    },
+    {
+      "id": "plant-04-correct-but-mute",
+      "targets": "eval-infra-per-commit-cost",
+      "attacks": "Halo effect. Technically excellent cost arithmetic, delivered as an unstructured dump that never addresses the person asking and silently answers only half the question. Strong content must not inflate the communication score.",
+      "transcript": [
+        {"speaker": "candidate", "text": "Okay so 50,000 times 2,000 is 100 million tokens. Divided by 600 seconds that is 166,666 tokens per second. A four-H100 replica does maybe 6,000 tokens a second so that is 27.7 replicas, call it 28, times 4 is 112 GPUs. At 2 dollars a GPU-hour for ten minutes that is 18.6 GPU-hours, so 37 dollars and 30 cents. Times 40 commits is 1,492 dollars a day. Annualised that is 544,580 dollars. The judge calls add more depending on which judge model. There is also cold start on the replicas which I have not accounted for, and sharding overhead. Storage for the results is negligible. Network egress depends on where the judge runs."}
+      ],
+      "required_outcome": {
+        "requirements_scoping": "<= 1 — never named what binds, never cut scope, never asked what decision the gate is meant to make",
+        "communication_collaboration": "<= 1 — no structure, never addressed the asker, trailed into irrelevance, and silently skipped the 'what would you push back on' half of the question"
+      },
+      "known_defect_probed": "The arithmetic here is better than the reference answer's. None of it is on an axis this item scores. A grader that scores the transcript rather than the axes will reward it anyway."
+    },
+    {
+      "id": "plant-05-jargon-dense-and-wrong",
+      "targets": "kv-cache-admission-control",
+      "attacks": "`terms` degrading into a keyword scorer. Dense, accurate, current vocabulary throughout; the conclusion contradicts the capacity reality of the scenario. This is the plant most likely to fool a judge prompted with a term list.",
+      "transcript": [
+        {"speaker": "candidate", "text": "Right, this is classic KV cache pressure. We are on paged attention so the cache is block-allocated, which means fragmentation is already under control — vLLM gets waste under 4 percent. So the real issue is eviction policy. I would add a radix tree for prefix caching so common prompt prefixes are shared across requests, introduce chunked prefill so a long request cannot monopolise a single forward pass, and switch block eviction to LRU-K so that recently-touched short-request blocks are not evicted by one long sequence walking through. With grouped-query attention the per-token footprint is already small. That should recover the short-request p99 without needing to change admission at all."}
+      ],
+      "required_outcome": {
+        "requirements_scoping": "<= 1 — never named what is being protected, never stated a target for either class",
+        "capacity_cost_estimation": "<= 1 — cap fires, no quantity derived; the only number is a recalled statistic about someone else's system"
+      },
+      "known_defect_probed": "Every term in this answer is in the item's `terms` list or adjacent to it, and the conclusion is wrong. If `terms` is fed to the judge as evidence of competence rather than as diagnostic vocabulary, this scores at bar."
+    },
+    {
+      "id": "plant-06-collapses-under-pushback",
+      "targets": "agent-retry-side-effects",
+      "attacks": "The communication axis in the yielding direction. A correct position, abandoned at the first probe with no defence. Must not be read as collaborative or coachable.",
+      "transcript": [
+        {"speaker": "candidate", "text": "Twelve tools at 2 percent each means something times out on about 21 percent of turns, so this is the normal path, not an edge case. The actual bug is that retrying the whole turn re-executes side effects, so we are duplicating emails and double-charging. I would put an idempotency key on each logical operation, generated once per turn."},
+        {"speaker": "interviewer", "text": "My teammate thinks retries at the tool layer handle this."},
+        {"speaker": "candidate", "text": "Yeah, you know what, that is probably fine actually. If the retries live at the tool layer then each tool handles its own failure, which is cleaner separation anyway. Let's go with that."}
+      ],
+      "required_outcome": {
+        "deep_dive_failure_modes": "may reach 2 — turn one was genuinely at bar and the compound probability was derived correctly",
+        "communication_collaboration": "<= 1 — abandoned a correct design because it was questioned, with no attempt to defend it"
+      },
+      "known_defect_probed": "The published guides treat integrating interviewer feedback as a positive signal. A grader that learns 'took the feedback' without checking whether the feedback was right will score this at bar. The distinction is whether anything was weighed."
+    },
+    {
+      "id": "plant-07-digs-in-under-pushback",
+      "targets": "inline-safety-classifier-budget",
+      "attacks": "The communication axis in the stubborn direction, which is the easier one to miss because stubbornness reads as confidence in a transcript. Paired deliberately with plant 06: both directions must fail.",
+      "transcript": [
+        {"speaker": "candidate", "text": "We cannot run it async. Policy requires the classifier on every request. It has to be inline."},
+        {"speaker": "interviewer", "text": "I hear you, but the budget does not close either way. We are at 310 at p99 with 90 milliseconds of headroom and the classifier wants 180."},
+        {"speaker": "candidate", "text": "I understand, but it is a policy requirement. We are not allowed to ship unsafe output. The classifier runs inline. If the budget is a problem then the budget needs to change, but the classifier is not negotiable."}
+      ],
+      "required_outcome": {
+        "requirements_scoping": "<= 1 — never engaged the 400 / 310 / 180 arithmetic, never named the fail-open versus fail-closed decision or who owns it",
+        "communication_collaboration": "<= 1 — repeated the original position, treated the probe as a misunderstanding rather than information, produced no design"
+      },
+      "known_defect_probed": "This candidate is technically CORRECT about the policy. The grader must not reward being right while being useless, and must not read refusal-to-move as conviction."
+    },
+    {
+      "id": "plant-08-right-answer-wrong-scenario",
+      "targets": "kv-cache-admission-control",
+      "attacks": "Whether the grader reads the prompt or only the answer. This is a strong, numerate, at-bar answer — to a different question in the same bank.",
+      "transcript": [
+        {"speaker": "candidate", "text": "The problem is that a fixed batch size makes time-to-first-token depend on batch fill rather than on compute. 70 billion parameters in bfloat16 is 140 gigabytes of weights; across four H100s at 3.35 terabytes per second that is roughly 13 terabytes per second aggregate, so one decode step floors near 10 milliseconds, and that same step serves the whole batch. So I would move to continuous batching and size the admission window at 20 to 25 milliseconds against the budget, rather than picking a batch size. The trade-off is explicit: a wider window buys throughput and spends tail latency, and at this target I spend throughput. I would track p99 time-to-first-token and inter-token latency as separate series."}
+      ],
+      "required_outcome": {
+        "requirements_scoping": "<= 1",
+        "capacity_cost_estimation": "<= 1 — the arithmetic is correct and is about the wrong binding constraint; it never touches KV bytes, context length, or the two request classes"
+      },
+      "known_defect_probed": "SUSPECTED RUBRIC GAP. The content-axis cells describe quality of reasoning and do not explicitly require that the reasoning be about the question asked. Only `communication_collaboration` band 1 mentions answering a different question, and this item does not score that axis. If this plant scores at bar, the rubric needs a relevance clause on the content axes."
+    },
+    {
+      "id": "plant-09-spiky",
+      "targets": "heterogeneous-fleet-routing",
+      "attacks": "Score smoothing. Deliberately top-band on one axis and absent on the other. A grader that regresses toward the mean destroys the named-blind-spot reveal, which is the entire share mechanic.",
+      "transcript": [
+        {"speaker": "candidate", "text": "Decode cost tracks weight bytes read, so the 8B is roughly an order of magnitude cheaper per token than the 70B, and the 400B is about five to six times worse than the 70B again. If 70 percent goes to the 8B, blended cost is 0.7 times a tenth plus 0.3 times one, which is 0.37 — so about 37 percent of what all-70B serving costs. Against the dollar fifty ceiling that clears comfortably; I would expect to land somewhere near 55 cents. If quality forces the split closer to 50-50 we are at 0.55 of baseline and still inside. The ceiling only starts to bind if the 8B share drops below roughly 20 percent, so that is the number I would watch."}
+      ],
+      "required_outcome": {
+        "capacity_cost_estimation": "== 3 — derived unprompted, drove the conclusion, and named the reversal condition",
+        "high_level_design": "<= 1 — no router, no cascade, no escalation path, no component of any kind. Band 0 is defensible"
+      },
+      "known_defect_probed": "A 3 and a 0 on the same answer. If the grader returns 2 and 2, it has collapsed the scale and the scorecard will have no named blind spot to report."
+    },
+    {
+      "id": "plant-10-verbatim-model-answer",
+      "targets": "training-data-dedup-and-shuffle",
+      "attacks": "This pack, not the grader. If the reference answer does not score at the top of the rubric it was written against, then the rubric and the model answers contradict each other. Run this one FIRST.",
+      "transcript": [
+        {"speaker": "candidate", "text": "These are three requirements with three different failure modes, and the nine days is the least urgent of them. Reproducibility is the cheapest and most valuable fix: content-address the shards so they are immutable, then record the manifest, the seed, and the ordering function with the run. That regenerates the exact batch sequence six months later without storing it, and it is days of work, not weeks. Second, the shuffle. A true global shuffle of 4 petabytes means writing 4 petabytes — at even 100 gigabytes a second of sustained I/O that is on the order of 11 hours, so it is not something you do every epoch. I would shuffle once into shards at ingest and do cheap in-shard shuffling plus shard-order randomisation per epoch, which is where the trust problem probably comes from: nobody has measured the resulting distribution. I would add a verification job that samples it. Dedup I would leave at nine days and move it off the critical path, because it runs once per corpus version, not once per run."}
+      ],
+      "required_outcome": {
+        "high_level_design": ">= 2, expected 3",
+        "deep_dive_failure_modes": ">= 2, expected 3"
+      },
+      "known_defect_probed": "If this lands at 2 and 2 rather than 3 and 3, the model answers are not written to the band they are supposed to teach, and every grade anchored on them will be pulled low. Generalise the check to all 12 before trusting any of them."
+    }
+  ]
+}

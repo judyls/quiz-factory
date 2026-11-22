@@ -11,7 +11,8 @@
 
 1. The **6-axis rubric** with observable behaviors at each of 4 levels.
 2. **40 scenarios**, AI-infra flavored, each with a reference solution tree.
-3. The **12 diagnostic items** (multiple choice) derived from the scenarios.
+3. The **12 diagnostic items** (open spoken response, graded by the judge) derived from
+   the scenarios.
 4. The **grader calibration set** and the agreement measurement.
 5. The **public scenario pages** — the worked at-bar answers that double as the
    acquisition engine.
@@ -142,20 +143,53 @@ conditional branches per scenario.
 
 ### The 12 diagnostic items
 
-Derive multiple choice items from the scenarios. Rules:
+**Open spoken response, not multiple choice.** The engine already captures voice,
+transcribes it, and runs a judge against vetted per-item rubrics — so the diagnostic uses
+the instrument the engine has, and the same rubric grades both the diagnostic and the paid
+mock. Shipped form: `questions.json` in this folder.
+
+**Why not multiple choice**, since the playbook's generic Layer 1 prescribes it and it is
+the cheaper instrument:
+
+- `communication_collaboration` is **structurally unmeasurable** by multiple choice. It is
+  one of the six axes, the playbook names a communication axis as mandatory, and it is the
+  most shareable finding on the scorecard because nobody has ever scored it for this
+  cohort. An instrument that cannot produce it cannot produce the artifact.
+- Recognising the right answer among four and *generating* it under time pressure are
+  different skills, and the loop tests the second one. A multiple-choice diagnostic would
+  systematically over-score the cohort, and the reveal has to be credible enough to share.
+- One rubric across both instruments is what lets the diagnostic be the baseline the paid
+  product shows movement against. Two instruments means two calibrations and a progress
+  claim that does not hold.
+
+Rules, which keep the parts of the playbook's guidance that survive the format change:
 
 - Scenario-based forced tradeoff under constraints. Never trivia — trivia is googleable and
-  measures recall, not the thing the loop tests.
-- 4 options, **at least 2 defensible-looking**. The discriminator is always whether the
-  reader reasons from the stated constraint.
-- **Every distractor is a real mistake a competent senior engineer makes.** If a distractor
-  is obviously wrong, you have wasted one of only 12 slots. Source distractors from the
-  `traps` field — those are real by construction.
-- Include 2 items requiring an actual number or order of magnitude. Highest-signal items in
-  the instrument.
-- Each item maps to 1–2 axes, so 12 items produce a 6-axis profile with ≥2 items per axis.
-- Target difficulty: a strong candidate gets ~8/12. If the median is 10+, the items don't
-  discriminate and the percentiles become meaningless.
+  measures recall, not the thing the loop tests. **Unchanged, and it is the important one.**
+- **Hard numeric constraints stated in the prompt**, and the prompt asks for exactly ONE
+  load-bearing decision plus its reason. A 45-minute design cannot be answered in 60
+  seconds; a single judgement call can.
+- **Answerable out loud in under 60 seconds.** Reference answers run ~150–175 words. An
+  item whose answers systematically run long is over-scoped — see the item analysis in
+  `calibration-plan.md`.
+- **Every `model_answer` contains at least one concrete number**, with its derivation or its
+  assumption stated out loud. No exceptions. A model answer without a number teaches the
+  judge that vagueness scores at the bar.
+- **The `traps` become the `bad` field, not distractors.** Same discipline, better use: each
+  `bad` is a real failure mode a competent senior engineer actually makes, and the write-up
+  says *why* it is real. Several are failure modes the published interview guides name
+  directly. An invented failure mode teaches the judge to penalise something nobody does.
+- `terms` is diagnostic vocabulary, **not a keyword scorer**. Presence of a term is not
+  credit. Absence of all of them alongside a correct decision is a communication finding,
+  not a knowledge finding. The judge must be told this explicitly or it degrades into bingo.
+- Each item maps to 1–2 axes. Twelve items × 2 axes = 24 slots over 6 axes, so aim for
+  **4 items per axis** rather than the ≥2 minimum — per-axis reliability is what makes the
+  named blind spot defensible, and a 2-item axis cannot support it.
+- **Difficulty targets do not carry over.** "A strong candidate gets ~8/12" is a
+  right/wrong-scored target. For an ordinal 0–3 instrument the equivalent checks are mean
+  band per item, item–total correlation, floor/ceiling share, and per-axis Cronbach's α —
+  all specified with thresholds in `calibration-plan.md`. Expect to cut items, so author
+  4–6 spares from the same families.
 
 ---
 
@@ -211,8 +245,20 @@ here is both wrong and, for this cohort, instantly noticed.
 ## HANDOFF CONTRACT
 
 To the **build agent**: rubric as structured data (24 behavior cells), 40 scenarios in the
-schema above, 12 diagnostic items with axis mappings, grader + interviewer prompts,
-calibration report.
+schema above, 12 open-response diagnostic items with axis mappings, grader + interviewer
+prompts, calibration report.
+
+The diagnostic is **open spoken response**, which has two consequences the build agent owns:
+
+1. **A mic-permission prompt before question 1 would violate the hardest non-negotiable in
+   the playbook** — no interstitial before first paint. So question 1 renders with a text
+   box and offers voice as an upgrade; the text path stays first-class, not a fallback,
+   because it is also what every user on a shared desk or a commute uses. The judge grades
+   the transcript either way and must not reward spoken answers over typed ones.
+2. **The hard caps in `rubric.md` are code with tests, not prompt text**, and the ten
+   adversarial plants in `calibration-plan.md` belong in the test suite as fixtures. They
+   are regression tests on grader harshness and the cheapest protection against drift
+   toward flattery across prompt revisions.
 
 To the **GTM agent**: the 40 scenario slugs and titles, the rubric axes in plain language
 for public copy, and the calibration numbers — they are the strongest credibility claim the

@@ -82,7 +82,7 @@ prompt: >            # one paragraph, realistic, hard constraints stated up fron
 constraints: []
 required_beats: []   # what an at-bar person must reach
 traps: []            # plausible wrong turns; the counterpart probes toward these,
-                     # and they become your multiple-choice distractors for free
+                     # multiple-choice distractors, or the `bad` field, for free
 followup_tree: []    # escalating probes, CONDITIONAL on what the person has said
 at_bar_answer: >     # the worked answer. Grader contrast + published on /q/[slug]
 sources: []
@@ -96,7 +96,10 @@ said, and it escalates when they're doing well. **≥6 conditional branches per 
 
 - Scenario-based forced tradeoff under constraints. Never trivia — trivia is lookup-able
   and measures recall, not the thing the real event tests.
-- 4 options, **≥2 defensible-looking**.
+- **Pick the format first.** Multiple choice is the default; open response if any axis is
+  about how the person communicates, because multiple choice cannot measure that. See the
+  format note in `playbook/QUIZ-FACTORY.md`, Layer 1.
+- If multiple choice: 4 options, **≥2 defensible-looking**.
 - **Every distractor is a real mistake a competent person makes.** An obviously-wrong
   distractor wastes one of only `<<N>>` slots. Source from `traps`.
 - ≥2 items requiring an actual number or order of magnitude.

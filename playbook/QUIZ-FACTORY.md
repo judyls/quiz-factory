@@ -97,6 +97,16 @@ Five layers. Build in this order. Do not skip layer 3.
   reasons from the constraint.
 - Every distractor must be a **real mistake a competent person makes**. If a distractor is
   obviously wrong, the question measures nothing and you have burned a slot.
+- **Decide the response format deliberately; multiple choice is the default, not the rule.**
+  Multiple choice is the lowest-friction instrument and is usually right. But if any scored
+  axis is about *how the person communicates*, multiple choice cannot measure it, and the
+  playbook requires at least one such axis — so check this before writing items. Open
+  response (typed or spoken, graded by the judge against the same rubric) measures
+  generation rather than recognition, costs real friction, and needs ordinal item analysis
+  instead of a percent-correct target. The system design vertical went open-response for
+  exactly this reason; see `verticals/system-design-interviews/02-CONTENT-AGENT.md`. If you
+  go open-response, **question 1 must still render on first paint with a text box** — a
+  mic-permission prompt before the first question is the interstitial this layer forbids.
 - Mix in 1–2 items that require an actual number (an estimate, an order of magnitude).
   These are the highest-signal items in the whole instrument.
 - Drop-off per question is your most important early telemetry. Instrument it from day one.
