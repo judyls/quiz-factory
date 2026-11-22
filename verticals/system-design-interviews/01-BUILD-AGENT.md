@@ -71,9 +71,19 @@ design questions; speed and depth of the rubric are the defense, not secrecy.
 no start button, no email gate. A returning user resumes from `localStorage`.
 
 Format of every item: a realistic frontier-lab infra situation, **hard numeric
-constraints**, and 4 options of which at least 2 look defensible. The discriminator is
-always whether the candidate reasons *from the stated constraint*. Every distractor is a
-mistake a competent senior engineer actually makes.
+constraints**, and **one open spoken answer of under 60 seconds** — not multiple choice.
+The discriminator is always whether the candidate reasons *from the stated constraint*.
+Shipped items are in `questions.json`; the reasoning for the format is in
+`02-CONTENT-AGENT.md`, and the short version is that `communication_collaboration` is one of
+the six scored axes and multiple choice cannot measure it at all.
+
+**This collides with "question 1 renders on first paint"**, because a mic-permission prompt
+is exactly the interstitial the playbook forbids. Resolution: **question 1 renders with a
+text box**, with voice offered as an upgrade once the user is already answering. Keep the
+text path first-class rather than a fallback — it is also what every user on a shared desk
+or a commute will use — and make sure the judge does not score spoken answers above typed
+ones. Capture `ms_to_answer` and input mode on every item; if typed answers score
+systematically lower, that is an instrument defect, not a finding about the user.
 
 Seed scenarios — hand to the content agent for expansion to 40, keep the AI-infra framing
 over classic CRUD, because that framing is the whole positioning:

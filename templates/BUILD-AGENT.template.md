@@ -22,11 +22,20 @@
 
 - `<<N>>` items, `<<N>>` minutes. **Question 1 renders on first paint at `/`.** No landing
   page, no start button, no email gate. Resume from `localStorage`.
-- Every item: a realistic `<<DOMAIN>>` situation, **hard constraints stated**, 4 options
-  with ≥2 defensible-looking. The discriminator is always whether the person reasons from
-  the stated constraint. Never trivia.
-- Every distractor is a real mistake a competent `<<COHORT>>` makes. Source them from the
-  content agent's `traps` field.
+- Every item: a realistic `<<DOMAIN>>` situation, **hard constraints stated**. The
+  discriminator is always whether the person reasons from the stated constraint. Never
+  trivia.
+- **Confirm the response format with the content agent before building the item UI** — they
+  own that call (see the format note in `playbook/QUIZ-FACTORY.md`, Layer 1), and it decides
+  whether you build a 4-option control or a capture-and-grade path. Multiple choice is the
+  default. If any scored axis is about *how* the person communicates, it will be open
+  response, and then: **question 1 still renders on first paint with a text box**, because a
+  mic-permission prompt is the interstitial this layer forbids. Capture input mode and check
+  that typed answers do not score below spoken ones — if they do, that is an instrument
+  defect, not a finding about the user.
+- If multiple choice: 4 options, ≥2 defensible-looking, and every distractor is a real
+  mistake a competent `<<COHORT>>` makes. Source them from the content agent's `traps`
+  field. If open response: `traps` becomes the graded `bad` field instead.
 - Include 1–2 items requiring an actual number or order of magnitude. Highest-signal items
   in the instrument.
 - Instrument per-question drop-off from the first deploy.
