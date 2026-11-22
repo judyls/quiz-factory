@@ -82,7 +82,7 @@ of 0.60 at n = 10 is not distinguishable from 0.45.** So:
 
 ## PHASE 1 — Build the golden set
 
-### Composition: 30 diagnostic sets, deliberately unbalanced
+### Composition: 32 diagnostic sets, deliberately unbalanced
 
 A random sample of volunteers will cluster in the middle and leave both tails untested,
 and the tails are where graders fail.
@@ -92,13 +92,13 @@ and the tails are where graders fail.
 | 12 | Real candidates recruited from the cohort (r/ExperiencedDevs, ML-infra Discords), paid, told they are helping calibrate | The actual distribution |
 | 4 | Practitioners who pass these loops, answering normally | Establishes that band 3 is reachable |
 | 4 | Practitioners asked to answer **at the mid-level bar on purpose** | The 1/2 boundary, which is where percentile claims live |
-| 10 | **Adversarial plants, authored** (below) | Each targets one specific grader failure |
+| 12 | **Adversarial plants, authored** (below) | Each targets one specific grader failure |
 
 Real transcripts cannot be replaced by synthetic ones for the first 20. A grader tuned
 only on model-written answers learns to grade model-written answers, which is a different
 distribution from a nervous human speaking for 60 seconds.
 
-### The 10 adversarial plants
+### The 12 adversarial plants
 
 Cheap to write, highest-yield test cases in the plan. Each has a **required** grader
 outcome; failing one is a blocking defect, not a tuning note.
@@ -108,16 +108,24 @@ rubric in [`dry-run-report.md`](dry-run-report.md) — 9 of 10 passed and the ex
 three rubric defects, all since fixed. Note that the dry run was self-grading, so it
 measured internal consistency only; the plants' real job starts when the grader exists.
 
+Plant 03 was split after the dry run: its `== 2` assertion contradicted the band 2 cell,
+which requires naming the binding constraint. 03a (number contradicts design, ≤ 1) and 03b
+(number right, link unstated, == 2) now bracket band 2 from both sides. 08b was added as a
+negative control for the relevance gate — every other plant tests harshness, so without it
+a grader that over-fires the gate passes the whole set.
+
 | Plant | What it is | Required outcome |
 | --- | --- | --- |
 | 1. **Confident and empty** | Fluent, well-structured, correct-sounding, contains no quantity at all | `capacity_cost_estimation ≤ 1` via the hard cap. If it scores 2+, the cap is not enforced in code |
 | 2. **Pros and cons, no decision** | Lists both sides of every trade-off articulately and never picks | `tradeoff_articulation ≤ 1`. The sources name this as a common real failure [IIO-1] |
-| 3. **Number salad** | Many numbers, all decorative, none load-bearing, no decision changed | `capacity_cost_estimation ≤ 2`. Band 3 requires the number to have moved a decision |
+| 3a. **Number contradicts design** | Correct 40TB, never names memory as binding, picks HNSW anyway | `capacity_cost_estimation ≤ 1`. Band 2 requires naming the binding constraint |
+| 3b. **Number right, link unstated** | Correct derivation, memory named as binding, consistent pick justified by convention | `capacity_cost_estimation == 2` exactly. A 3 means the grader inferred the "so" |
 | 4. **Correct but mute** | Right design, no structure, no signposting, answers a different question than asked | High on 3/4, low on `communication_collaboration`. Tests axis independence |
 | 5. **Jargon-dense and wrong** | Dense correct vocabulary, conclusion contradicts a stated constraint | Must not score above band 1 on the content axes. Tests that `terms` has not become a keyword scorer |
 | 6. **Collapses under pushback** | Correct answer, abandons it entirely at the first probe | `communication_collaboration ≤ 1` |
 | 7. **Digs in under pushback** | Correct answer, repeats it louder, treats the probe as a misunderstanding | `communication_collaboration ≤ 1`. Both directions must fail, not just one |
 | 8. **Right answer, wrong scenario** | A strong answer to a neighbouring question | Should score low. Tests the grader reads the prompt, not just the answer |
+| 8b. **Detour, then on-problem** (negative control) | Opens with plant 08's batching framing, rejects it, solves the KV problem | Gate must **not** fire; both axes ≥ 2 |
 | 9. **Band 3 on one axis, 0 on another** | Deliberately spiky | Must produce a spiky scorecard. A grader that smooths toward the mean destroys the named-blind-spot reveal, which is the share mechanic |
 | 10. **Verbatim `model_answer`** | The reference answer, read aloud | Should score near-ceiling. If it does not, the rubric and the model answers disagree with each other, and the rubric is probably right |
 
@@ -179,7 +187,7 @@ label, on the **held-back 10** as well as the 20 used for tuning.
 | Weighted κ per axis | ≥ 0.60 on at least 5 of 6 axes; no axis below 0.40 | Tune the prompt. If one axis stays low across prompt revisions, the rubric cell is the problem |
 | Adjacent agreement per axis | ≥ 90% | The grader is making catastrophic misreads, not boundary calls |
 | **Mean signed error (grader − human)** | within **±0.20 bands**, and **never above +0.20** | **This is the flattery number.** Positive bias means systematic generosity, and it can coexist with acceptable κ |
-| All 10 plants | every required outcome met | Blocking. A failed plant is a defect, not a score |
+| All 12 plants | every required outcome met | Blocking. A failed plant is a defect, not a score |
 | Hard caps | 100% enforced in code, verified by test | A cap that lives only in the prompt is not a cap |
 | Evidence quotes | every score has a quote; every 3 has a quote containing the consequence | A 3 without a consequence quote is the grader's opinion |
 
@@ -235,7 +243,7 @@ Honest estimate so this can be approved or rejected rather than discovered mid-b
 
 | Step | Effort | Dependency |
 | --- | --- | --- |
-| Author the 10 adversarial plants | ~1 day, content side | Now. Nothing blocks this |
+| Author the 12 adversarial plants | ~1 day, content side | Now. Nothing blocks this |
 | Practitioner review of `rubric.md` + 12 items | ~4 hours × 2 practitioners, paid | Before any labelling. **This is the gate on everything** |
 | Phase 0 inter-human agreement (10 sets) | ~6 hours × 2 scorers | Needs 10 real diagnostic sets |
 | Recruit + record 20 real sets | 2–3 weeks elapsed, mostly waiting | Needs the diagnostic live (Phase 2 of the build) |
@@ -270,7 +278,7 @@ against this pack as written.
 ## Handoff notes
 
 **To the build agent:** the hard caps in `rubric.md` are code, not prompt text, and there
-is a test per cap. `grader_version` and `norm_version` on every row. The 10 plants belong
+is a test per cap. `grader_version` and `norm_version` on every row. The 12 plants belong
 in the test suite as fixtures — they are regression tests on grader harshness, and they are
 the cheapest protection against the grader drifting generous across prompt revisions.
 Percentile display is gated at n ≥ 200.
