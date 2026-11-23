@@ -88,9 +88,9 @@ constraints before scoring any axis.
 answer's decision rests on. Code clamps the axis to ≤ 1 when `addresses_prompt` is false or
 the quoted constraint is not in the prompt. The gate tests the answer's **binding constraint
 and decision**, not its topic or vocabulary: a neighbouring scenario considered and rejected
-on the way to the right problem does not trigger it. (A negative-control fixture covers
-exactly this over-firing case; it is named in `calibration-plants.json` rather than here,
-because naming fixtures in a file reviewers read de-blinds anyone asked to score them.)
+on the way to the right problem does not trigger it. The over-firing case has its own
+negative-control fixture; which one it is stays in `calibration-plants.json`, because
+describing a fixture in a file reviewers read de-blinds anyone asked to score it.
 
 ### From item scores to an axis score — the aggregation rule
 

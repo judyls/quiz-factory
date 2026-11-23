@@ -1,9 +1,11 @@
 # REVIEW PROTOCOL — the output contract
 
-Do **Part A before Part B**. Write `findings/<your-slug>.md`.
+Do **Part A before Part B**. Write `findings/run-<N>/<your-slug>.md`, where `<N>` is the
+run number you were given and `<your-slug>` is the slug in your persona brief.
 
 **Do not open** `../calibration-plants.json`, `../dry-run-report.md`,
-`../calibration-plan.md`, or anything in `findings/`. All four contain expected scores or
+`../calibration-plan.md`, or anything in `findings/` or `keys/`. All of these contain
+expected scores or
 another reviewer's judgement. If you open one by accident, say so in your report and name
 the affected cell — a disclosed contamination costs one cell, an undisclosed one costs the
 whole measurement.
@@ -12,8 +14,9 @@ whole measurement.
 
 ## Part A — Blind scoring (do this first)
 
-Open `blind-scoring-set.md`. For each of the 5 answers, score **only the listed axes**
-against `../rubric.md`.
+Open `blind-scoring-set.md`. For each answer in it, score **only the listed axes** against
+`../rubric.md`. The set is generated from the fixtures and its length changes between runs,
+so work from the file and not from a count stated anywhere else — including here.
 
 For each (answer, axis) produce exactly this:
 

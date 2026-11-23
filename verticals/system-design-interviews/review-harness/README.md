@@ -49,12 +49,12 @@ company asks a specific question.
 
 Each reviewer does Part A **before** Part B, and does not read the other reviewers.
 
-- **Part A — blind scoring.** Score 5 answers in `blind-scoring-set.md` against
+- **Part A — blind scoring.** Score the answers in `blind-scoring-set.md` against
   `../rubric.md`. Expected scores are stripped. This is the inter-rater measurement.
 - **Part B — critique.** Review `../rubric.md`, `../questions.json`, `../prompts.md` from
   the reviewer's domain. Arithmetic, realism, defects, sign-off.
 
-**Off limits to reviewers:** `../calibration-plants.json`, `../dry-run-report.md`,
+**Off limits to reviewers:** `keys/`, `../calibration-plants.json`, `../dry-run-report.md`,
 `../calibration-plan.md`, and anything in `findings/`. The first two obviously carry
 expected scores. **`calibration-plan.md` was missed in run 1** — it carries the full
 per-plant outcome table, and a reviewer self-disclosed reading it and asked for the
@@ -68,9 +68,10 @@ actually tried to apply the rubric, rather than by reading it as prose.
 | Path | What |
 | --- | --- |
 | `review-protocol.md` | What every reviewer must produce. The output contract |
-| `blind-scoring-set.md` | 5 candidate answers, expected scores stripped |
+| `blind-scoring-set.md` | The candidate answers, expected scores stripped. Generated, not hand-written |
+| `generate-blind-set.py` | Generates the above from the fixtures, and asserts no expected score leaked |
 | `personas/*.md` | The 5 reviewer briefs |
-| `findings/` | One report per reviewer, plus the synthesis |
+| `findings/run-<N>/` | One report per reviewer per run, plus that run's synthesis and answer key |
 
 ## Blinding defects fixed after run 1
 
@@ -86,11 +87,45 @@ Both self-disclosed by reviewers, unprompted. Both mine.
    two answers sharing an item are no longer adjacent. Separately, `rubric.md` and
    `prompts.md` each named a fixture by number; both now describe it without naming it.
 
-**Lesson for re-runs:** anything a reviewer is told to read is part of the blind. Before
-each run, grep the allowed reading list for expected scores and fixture names.
+## Blinding defects fixed after run 2
+
+Two self-disclosed by reviewers again, one caught by all five.
+
+3. **The answer key was in the directory reviewers write into.** Listing `findings/run-2/`
+   to create a report returned the key's filename. The reviewer did not open it and said so.
+   Keys now live in `keys/`, which is off limits and which nobody needs to list.
+4. **The set claimed the pairing was hidden when it was not.** Two answers quoted
+   byte-identical prompts while the preamble forbade inferring which answers shared an item.
+   Run 1's fix — separate the pair — does not help when the prompt text is the tell. The
+   preamble now says a shared prompt is visible and carries no information about either
+   score, which is true, instead of an instruction a reader can see is impossible.
+5. **The protocol said "the 5 answers" when the set had 7.** A patch targeting a string
+   that did not match the file, which failed silently. All five reviewers noticed.
+
+**Lesson for re-runs:** anything a reviewer is told to read is part of the blind — and so is
+anything they must *list* to do their job. Before each run, grep the allowed reading list for
+expected scores and fixture names, and for counts that go stale. Every blinding defect across
+both runs was in material written while thinking about blinding, so assert mechanically:
+`generate-blind-set.py` aborts on a leak, and any patch to the prose must assert its target
+exists before replacing it.
 
 ## Re-running
 
-Re-run when `rubric.md` changes materially. Regenerate `blind-scoring-set.md` from
-`calibration-plants.json` rather than editing it by hand, so it cannot drift from the
-fixtures — and re-randomise the opaque labels when you do.
+Re-run when `rubric.md` changes materially. `python3 generate-blind-set.py <run> >
+blind-scoring-set.md` — never hand-edit the set, so it cannot drift from the fixtures. The
+script re-randomises labels per run, refuses to reuse a label from any earlier run, and
+aborts if an expected score, a fixture id or a required outcome survives into the output.
+
+Then grep every file the reviewers are allowed to read for fixture descriptions, not just
+fixture names: run 2 found `rubric.md` saying a negative-control fixture existed for the
+relevance gate, which was enough to telegraph one cell of the set.
+
+Findings go in `findings/run-<N>/`. Keep earlier runs: the only way to know whether a fix
+worked is to compare agreement on the answers the two runs share.
+
+### Runs
+
+| Run | Answers | Axes covered | Against |
+| --- | --- | --- | --- |
+| 1 | 5 | 3 of 6 | `908abee` — the pack as first written |
+| 2 | 7 | 6 of 6 | `d9de968` — after the 9 fixes from run 1's queue |
