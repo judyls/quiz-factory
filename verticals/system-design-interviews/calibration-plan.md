@@ -62,9 +62,20 @@ are missing.
 
 **Report per axis. Never report one aggregate agreement number.** Graders and humans alike
 fail on one or two specific axes, and an aggregate hides exactly the thing worth knowing.
-Prior expectation, stated in advance so it can be wrong: `tradeoff_articulation` and
-`communication_collaboration` will be the weakest, because both are judgements about the
-form of an answer rather than its content.
+
+**The prior recorded here was wrong, and it is left in place as a record.** It predicted
+`tradeoff_articulation` and `communication_collaboration` would be weakest, because both
+are judgements about the form of an answer rather than its content. In the simulated run
+(`review-harness/findings/00-SYNTHESIS.md`) **all five reviewers independently nominated
+`capacity_cost_estimation`** as the hardest axis to apply, by five different routes, while
+`tradeoff_articulation` was unanimous on every cell where it appeared.
+
+The revised prior, again stated in advance so it can also be wrong: **the contested boundary
+is 0-vs-1 and 1-vs-2 on `capacity_cost_estimation`, not the 2/3 boundary this plan calls
+"the whole instrument".** The 2/3 call was mechanical in nearly every blind cell. One
+reviewer predicted per-axis reliability will come back lowest on `high_level_design` and
+`deep_dive_failure_modes`, with the data-pipeline item the weakest-correlating; that is a
+second falsifiable prediction and it is recorded here for the same reason.
 
 ### Sample-size honesty
 
@@ -153,7 +164,8 @@ choice. These items are open response graded 0–3, so the equivalent checks are
 | Item difficulty | mean band per item across candidates | 1.2 – 2.0 | <1.0: prompt is unclear or unfair, not hard. >2.2: not discriminating |
 | Item discrimination | correlation of item band with the candidate's composite | ≥ 0.25 | <0.15: the item measures something unrelated. Replace it |
 | Floor / ceiling | % of candidates at band 0, % at band 3 | neither >40% | A 60%-at-0 item usually means the prompt withholds something the answer needs |
-| Axis reliability | Cronbach's α across the 4 items of each axis | ≥ 0.6 | <0.5: the four items are not measuring one axis. Likeliest culprit: `communication_collaboration`, where the four items differ in whether pushback occurs |
+| Axis reliability | Cronbach's α across the 4 items of each axis | ≥ 0.6 | <0.5: the four items are not measuring one axis. Simulated review predicts `high_level_design` and `deep_dive_failure_modes` lowest; this plan originally guessed `communication_collaboration`. Record which was right |
+| Aggregation | axis score = mean of assessed item scores, continuous — the rule is in `rubric.md` | — | This was unspecified until two reviewers found the level claim consumed an undefined number. Verify in code that nothing re-rounds an axis score to a band |
 | Answer length | words spoken | median under 170 | Items whose answers systematically run long are over-scoped for 60 seconds |
 
 **Expect to cut items.** 12 items that all survive first contact would be surprising; plan

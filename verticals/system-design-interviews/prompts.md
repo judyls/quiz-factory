@@ -286,6 +286,9 @@ Output JSON matching the schema exactly. No prose outside the JSON.
     "<axis_name>": {
       "assessed": true,
       "score": 0,
+      "derivation_steps": [
+        {"inputs": "140 GB weights, 13.4 TB/s aggregate", "op": "140/13400", "result_stated": "10ms"}
+      ],
       "evidence_quote": "verbatim candidate text",
       "evidence_timestamp_ms": 0,
       "addresses_prompt": true,
@@ -321,17 +324,45 @@ only in the prompt is not a cap; this table is the actual anti-flattery mechanis
 | Attribution | `first_raised_by == "interviewer"` ⇒ clamp that axis ≤ 1 |
 | Minimum criticism | fewer than 2 `below_bar_observations` ⇒ reject and re-ask |
 | Axis set | any axis scored that is not in `axes_to_score` ⇒ reject |
-| Contrast provenance | reject if `contrast.at_bar_answer` has higher trigram overlap with the candidate's transcript than with `model_answer` |
+| Contrast coverage | reject if `contrast.at_bar_answer` does not cover at least one beat from `<reference>.good` that the candidate missed, or if it contains a verbatim span of 8+ words from the candidate's transcript |
+| **Numeric truth** | any axis scored 2 or 3 on the strength of a quantity must carry `derivation_steps` that **code recomputes**. If the stated result does not follow from the stated inputs, reject — the grader scored the *form* of arithmetic without checking it |
+| Numeric consistency | reject a `band3_consequence` whose threshold or conclusion contradicts the candidate's own figures elsewhere in the transcript |
 | Versioning | `grader_version` stamped on every row, always |
 
 **Reject-and-re-ask, not repair.** Silently clamping a bad output teaches nothing and hides
 how often the grader misses. Log every rejection with its reason; the rejection rate per
 check is a live quality signal and belongs in `METRICS.md`.
 
+### Two things the first version of this table could not do
+
+Both found by simulated reviewers, and both were holes rather than bugs.
+
+1. **It enforced the *form* of a number and never its *truth*.** A candidate could state a
+   threshold with no derivation, contradicting their own figures, and pass every row with a
+   clean `band3_consequence`. That is exactly how one of the pack's own adversarial plants
+   got written with circular arithmetic and expected to score band 3. Hence
+   `derivation_steps` and the two numeric rows above: a quantity that earns a 2 or a 3 must
+   recompute in code.
+2. **The contrast-provenance check was theatre.** Trigram overlap against `model_answer` is
+   structurally rigged to pass (the contrast is *generated from* `model_answer`), blind to
+   the failure that matters — copying the candidate's *conclusions* rather than their
+   wording — and it false-fires on the strongest candidates, whose answers legitimately
+   resemble the reference. Replaced with required-beat coverage plus a verbatim-span check,
+   which tests the thing the row was supposed to protect.
+
+### Aggregation is not the grader's job
+
+The grader emits **per-item, per-axis** scores and nothing else. Combining the 4 items that
+score an axis into one axis score is **code**, by the rule in `rubric.md`
+(mean of assessed items, continuous, never re-rounded to a band). The grader must never see
+or emit an aggregate, a composite, a percentile, or a level claim — a model that knows the
+level it is about to produce will grade toward it.
+
 **The 12 plants in `calibration-plants.json` are the test suite for this prompt.** Each has
 a required outcome. Run all 12 on every material prompt change; a failed plant is a defect,
-not a score. Plant 08b in particular tests that the relevance gate does not over-fire — the
-other eleven only test harshness, so without it a gate that clamps everything passes.
+not a score. The set includes a **negative control** for the relevance gate — the others
+only test harshness, so without it a gate that clamps everything would pass the suite.
+Which fixture that is stays in the plants file: naming it here de-blinds reviewers.
 
 ---
 

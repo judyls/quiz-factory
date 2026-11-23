@@ -1,7 +1,12 @@
 # REVIEW PROTOCOL — the output contract
 
-Do **Part A before Part B**. Do not read other reviewers' findings. Write
-`findings/<your-slug>.md`.
+Do **Part A before Part B**. Write `findings/<your-slug>.md`.
+
+**Do not open** `../calibration-plants.json`, `../dry-run-report.md`,
+`../calibration-plan.md`, or anything in `findings/`. All four contain expected scores or
+another reviewer's judgement. If you open one by accident, say so in your report and name
+the affected cell — a disclosed contamination costs one cell, an undisclosed one costs the
+whole measurement.
 
 ---
 

@@ -188,18 +188,18 @@
     {
       "id": "plant-09-spiky",
       "targets": "heterogeneous-fleet-routing",
-      "attacks": "Score smoothing. Deliberately top-band on one axis and absent on the other. A grader that regresses toward the mean destroys the named-blind-spot reveal, which is the entire share mechanic.",
+      "attacks": "Score smoothing. Deliberately top-band on one axis and absent on the other. A grader that regresses toward the mean destroys the named-blind-spot reveal, which is the entire share mechanic. REWRITTEN after five blind reviewers scored the original 1,2,2,1,2 against an expected 3 — and they were right: the original transcript's cost figures were circular (it claimed 37 percent of baseline AND ~$0.55, implying a baseline equal to the ceiling) and its reversal threshold was false under its own numbers. A plant whose arithmetic is fabricated cannot test band 3, because band 3 should refuse it. This version derives everything from the baseline now stated in the prompt.",
       "transcript": [
         {
           "speaker": "candidate",
-          "text": "Decode cost tracks weight bytes read, so the 8B is roughly an order of magnitude cheaper per token than the 70B, and the 400B is about five to six times worse than the 70B again. If 70 percent goes to the 8B, blended cost is 0.7 times a tenth plus 0.3 times one, which is 0.37 — so about 37 percent of what all-70B serving costs. Against the dollar fifty ceiling that clears comfortably; I would expect to land somewhere near 55 cents. If quality forces the split closer to 50-50 we are at 0.55 of baseline and still inside. The ceiling only starts to bind if the 8B share drops below roughly 20 percent, so that is the number I would watch."
+          "text": "Cost per token tracks weight bytes read, so against the 70B the 8B is roughly a tenth and the 400B about five to six times more. Baseline is two sixty. At 70 percent on the 8B, 25 on the 70B and 5 on the 400B, the blend is 0.7 times 0.1, plus 0.25, plus 0.05 times 5.7 — about 0.6 of baseline, so near one fifty-seven. That is over the one-fifty ceiling. And the reason is not the small model: the 5 percent on the 400B contributes 0.285 of baseline while the whole 70 percent on the 8B contributes 0.07, so the big model's sliver costs four times what the small model saves. To get under the ceiling I need the 400B share below about 4 percent. That is the number I would hold the routing policy to."
         }
       ],
       "required_outcome": {
-        "capacity_cost_estimation": "== 3 — derived unprompted, drove the conclusion, and named the reversal condition",
-        "high_level_design": "<= 1 — no router, no cascade, no escalation path, no component of any kind. Band 0 is defensible"
+        "capacity_cost_estimation": "== 3 — derived from the prompt's stated baseline, unprompted, and the result changes the decision: it identifies the 400B share rather than the 8B share as the binding lever, and names the 4 percent threshold that follows. Every figure recomputes.",
+        "high_level_design": "<= 1 — no router, no cascade, no escalation mechanism, no component of any kind. Band 0 is defensible."
       },
-      "known_defect_probed": "A 3 and a 0 on the same answer. If the grader returns 2 and 2, it has collapsed the scale and the scorecard will have no named blind spot to report."
+      "known_defect_probed": "A 3 and a 0 on the same answer. If the grader returns 2 and 2 it has collapsed the scale and the scorecard has no named blind spot to report. Also tests the new numeric-truth check in `prompts.md` from the passing side: every quantity here recomputes from the prompt, so a grader that rejects it is over-firing."
     },
     {
       "id": "plant-10-verbatim-model-answer",

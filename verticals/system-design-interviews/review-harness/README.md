@@ -54,6 +54,12 @@ Each reviewer does Part A **before** Part B, and does not read the other reviewe
 - **Part B — critique.** Review `../rubric.md`, `../questions.json`, `../prompts.md` from
   the reviewer's domain. Arithmetic, realism, defects, sign-off.
 
+**Off limits to reviewers:** `../calibration-plants.json`, `../dry-run-report.md`,
+`../calibration-plan.md`, and anything in `findings/`. The first two obviously carry
+expected scores. **`calibration-plan.md` was missed in run 1** — it carries the full
+per-plant outcome table, and a reviewer self-disclosed reading it and asked for the
+affected cell to be excluded.
+
 Ordering matters: scoring blind first means Part B's critique is informed by having
 actually tried to apply the rubric, rather than by reading it as prose.
 
@@ -66,8 +72,25 @@ actually tried to apply the rubric, rather than by reading it as prose.
 | `personas/*.md` | The 5 reviewer briefs |
 | `findings/` | One report per reviewer, plus the synthesis |
 
+## Blinding defects fixed after run 1
+
+Both self-disclosed by reviewers, unprompted. Both mine.
+
+1. **`calibration-plan.md` carries the per-plant expected-outcome table** and the protocol
+   listed it as optional reading. Now off limits. The durable fix is to split that table
+   out of the plan; until then the exclusion stands.
+2. **The blind set's labels leaked.** Generated IDs were `A01, A03, A03, A08, A09` — they
+   encoded plant numbers, and two answers visibly shared a label, exposing them as a matched
+   pair on one item. A reviewer flagged its own scores on the affected answer as "the least
+   independent thing in the report". Labels are now opaque, the order is arbitrary, and the
+   two answers sharing an item are no longer adjacent. Separately, `rubric.md` and
+   `prompts.md` each named a fixture by number; both now describe it without naming it.
+
+**Lesson for re-runs:** anything a reviewer is told to read is part of the blind. Before
+each run, grep the allowed reading list for expected scores and fixture names.
+
 ## Re-running
 
-Re-run when `rubric.md` changes materially. The blind scoring set is regenerated from
-`calibration-plants.json` by the snippet in this repo's history — regenerate it rather than
-editing it by hand, so it cannot drift from the fixtures.
+Re-run when `rubric.md` changes materially. Regenerate `blind-scoring-set.md` from
+`calibration-plants.json` rather than editing it by hand, so it cannot drift from the
+fixtures — and re-randomise the opaque labels when you do.

@@ -13,7 +13,8 @@
       "Every model_answer contains at least one concrete number, with its derivation or its assumption stated out loud. A model answer without a number teaches the judge that vagueness scores 20.",
       "Every `bad` is a real failure mode observed in the category, not an invented wrong answer. Several are failure modes the published interview guides name directly.",
       "`terms` is diagnostic vocabulary, NOT a keyword scorer. Presence of a term is not credit; absence of all of them alongside a correct decision is a communication finding, not a knowledge finding. The judge must be instructed accordingly or it degrades into bingo.",
-      "Surface is AI infra. Substance is capacity math, queueing, backpressure, multi-tenancy, consistency. Say so on the public pages."
+      "Surface is AI infra. Substance is capacity math, queueing, backpressure, multi-tenancy, consistency. Say so on the public pages.",
+      "`followups` must ASK, never TELL. A probe that states the insight the candidate was supposed to produce breaks Prompt 1 rule 1, and then the `first_raised_by` clamp penalises the candidate for using a leak the item handed them. Three reviewers independently found three different leading probes; all are rewritten. Escalation branches are labelled `at_bar_1`, `at_bar_2`, never two branches with the same `if`, because Prompt 2 selects a probe verbatim by matching that label and a tie makes the diagnostic non-deterministic — which destroys the percentile."
     ],
     "axis_coverage": {
       "requirements_scoping": [
@@ -89,7 +90,7 @@
       "followups": [
         {
           "if": "no number produced",
-          "probe": "Give me a number. How long does one decode step take on that hardware?"
+          "probe": "What sets the floor on a decode step here?"
         },
         {
           "if": "says increase batch size",
@@ -100,11 +101,11 @@
           "probe": "You have added two idle replicas and the p99 has not moved. Why not?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_1",
           "probe": "Now 30 percent of traffic arrives with 100,000-token prompts. Does your window still hold?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_2",
           "probe": "Halve the GPU budget. What breaks first — the 400 milliseconds or the throughput?"
         }
       ]
@@ -140,18 +141,18 @@
         },
         {
           "if": "proposes an eviction policy",
-          "probe": "Which replacement policy frees 32 gigabytes on a card that is already full of weights?"
+          "probe": "How much memory would a policy have to free here? Can any of them free it?"
         },
         {
           "if": "one SLO for all traffic",
           "probe": "Your p99 is a blend of two classes. What does that metric tell you to do?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_1",
           "probe": "Product says long-context is the premium tier and must be fast. Now what?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_2",
           "probe": "What do you return to a rejected long-context request, and what does the client do with it?"
         }
       ]
@@ -194,11 +195,11 @@
           "probe": "You do not know the output length at admission. What do you charge?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_1",
           "probe": "One tenant is 40 percent of total traffic and is inside their limit. Is the system fair?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_2",
           "probe": "Where is the overshoot bounded, and what is the worst case in dollars?"
         }
       ]
@@ -230,7 +231,7 @@
       "followups": [
         {
           "if": "chooses strong consistency",
-          "probe": "What is the overdraft worth in dollars if you are wrong? Compare it to the cost of the ledger being down for an hour."
+          "probe": "Put a number on what you are protecting. What is the exposure worth?"
         },
         {
           "if": "chooses eventual with no bound",
@@ -241,11 +242,11 @@
           "probe": "A scheduler dies holding a lease. Where did those credits go?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_1",
           "probe": "Finance wants a per-team invoice that reconciles to the cent. Does your design survive that?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_2",
           "probe": "What is the first signal that reconciliation is silently wrong?"
         }
       ]
@@ -288,11 +289,11 @@
           "probe": "The user has seen 400 tokens and reconnects. Do they see them again, and who pays for them?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_1",
           "probe": "How long do you hold the buffer, and what does that cost at 60,000 concurrent?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_2",
           "probe": "The client is a server-side integration, not a browser. Does anything change?"
         }
       ]
@@ -305,7 +306,7 @@
         "requirements_scoping",
         "communication_collaboration"
       ],
-      "prompt": "Policy says a safety classifier runs on every request. It costs 40 milliseconds at p50 and 180 at p99. Our time-to-first-token budget is 400 milliseconds and we are already at 310 at p99. Your tech lead says: just run it asynchronously and retract anything bad after the fact. You disagree. Say what you would say to them.",
+      "prompt": "Policy says a safety classifier runs on every request. It costs 40 milliseconds at p50 and 180 at p99. Our time-to-first-token budget is 400 milliseconds and we are already at 310 at p99. Your tech lead proposes running it asynchronously alongside generation and killing the stream at the first unsafe token. What do you say to them?",
       "terms": [
         "latency budget",
         "critical path",
@@ -318,28 +319,32 @@
         "blocking",
         "retraction"
       ],
-      "good": "Engages the actual proposal rather than restating policy: asynchronous classification means tokens the classifier would have blocked have already been delivered to the user, so retraction is not a mitigation, it is a different product decision with a different risk owner. Then does the arithmetic that makes the disagreement concrete — 310 plus 180 does not fit in 400 — and so concedes the real point: the classifier does not fit on the critical path as currently built either. Proposes a third option rather than a stalemate: classify the prompt during prefill so the cost overlaps work already happening, or classify the first tokens before flush. Names the fail-open versus fail-closed decision and says who owns it. Keeps the register collaborative — it is a tech lead, not an adversary.",
-      "bad": "Wins the argument on policy — 'we have to, it is required' — without addressing that the budget does not close either way. This is a real failure mode and specifically a communication one: the person is technically right, is heard as inflexible, and leaves with no design. The other real failure is agreeing too fast and taking the async path without ever naming that someone is now accepting delivered-then-retracted unsafe output, which is a decision a tech lead cannot unilaterally make.",
-      "model_answer": "I would start by agreeing with the part they are right about. We are at 310 at p99 with 90 milliseconds of headroom and the classifier wants 180, so it does not fit on the critical path as things stand — the budget is already the problem. Where I disagree is on what async buys. If the classifier runs after we flush, the tokens it would have blocked are already on the user's screen, so retraction is not a mitigation, it is a different policy, and it is not ours to choose unilaterally. So I would propose a third thing: classify the prompt during prefill, which for a 2,000-token prompt is already hundreds of milliseconds of work we are paying for, so most of the 40 milliseconds overlaps and costs us almost nothing in wall clock. That covers the input case. For output we gate only the first flush. And I would make the fail-open versus fail-closed call explicit and take it to whoever owns the policy, rather than deciding it in this conversation.",
+      "good": "Engages the actual proposal rather than restating policy, and credits the part that is right: killing the stream is a genuine mitigation. Handles the arithmetic correctly — does NOT add the two p99 figures, because the p99 of a sum is not the sum of p99s, while still concluding that 90 milliseconds of headroom cannot absorb a stage whose own p99 is 180, so the current shape fails either way. Names what async actually costs: tokens already rendered before the kill, which is a policy decision with an owner rather than an engineering tradeoff. Proposes a third option — classify the prompt during prefill so the cost overlaps work already being done — and gates only the first output flush. Escalates the fail-open versus fail-closed call rather than deciding it. Keeps the register collaborative.",
+      "bad": "Wins on policy — 'we have to, it is required' — without addressing that the budget does not close either way. Technically right, heard as inflexible, and leaves the room with no design. The arithmetic failure that looks like rigour is adding the two p99s to get 490 and presenting that as the combined tail: p99s do not add, and a reviewer who knows that stops trusting the rest of the answer. The third real failure is accepting async without ever naming that someone is now choosing to let unsafe output render, which is not the tech lead's call to make alone.",
+      "model_answer": "First, their proposal is coherent — killing the stream is a real mitigation, not a hand-wave. Two things give me pause. One is arithmetic: I cannot just add 310 and 180, because the p99 of a sum is not the sum of the p99s. But I do not need to — with 90 milliseconds of headroom and a stage whose own p99 is 180, the tail does not fit however I compose them. So we agree the current shape is wrong. Two is what async buys. Killing at the first unsafe token means some unsafe tokens already rendered on someone's screen. That may be acceptable, but it is a policy call with a named owner, not ours to make here. What I would propose instead is classifying the prompt during prefill — for a 2,000-token prompt that is already hundreds of milliseconds we are paying for, so most of the 40 milliseconds overlaps and costs almost nothing. For output we gate the first flush only.",
       "followups": [
         {
           "if": "argues from policy only",
           "probe": "I agree it is required. The budget still does not close. What is your design?"
         },
         {
-          "if": "accepts async immediately",
-          "probe": "A user has now seen 200 tokens we would have blocked. Who signed off on that?"
+          "if": "adds the two p99 figures",
+          "probe": "Walk me through that addition again. Is the p99 of a sum the sum of the p99s?"
         },
         {
-          "if": "no number produced",
-          "probe": "Does 180 milliseconds fit in the budget or not? Show me."
+          "if": "accepts the async proposal immediately",
+          "probe": "How many tokens render before the kill lands, and who signed off on that?"
         },
         {
-          "if": "at bar",
+          "if": "no engagement with the numbers",
+          "probe": "How much headroom do we have, and how much does the classifier want?"
+        },
+        {
+          "if": "at_bar_1",
           "probe": "The classifier is down. Do you serve or refuse, and who decides?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_2",
           "probe": "Prompt classification is clean but the output turns unsafe at token 500. What did your design buy?"
         }
       ]
@@ -352,7 +357,7 @@
         "capacity_cost_estimation",
         "high_level_design"
       ],
-      "prompt": "Three models in production: 8 billion, 70 billion, and 400 billion parameters, on a mixed fleet of A100s and H100s. Finance has given you a blended ceiling of one dollar fifty per million output tokens. Offline evaluation says about 70 percent of current traffic would be served acceptably by the 8-billion model. How do you route, and what do you measure to know you have not quietly made the product worse?",
+      "prompt": "Three models in production: 8 billion, 70 billion, and 400 billion parameters, on a mixed fleet of A100s and H100s. We are at two dollars sixty per million output tokens today, everything on the 70B, and finance has given you a blended ceiling of one dollar fifty. Offline evaluation says about 70 percent of current traffic would be served acceptably by the 8-billion model; a few percent genuinely needs the 400B. How do you route, and what do you measure to know you have not quietly made the product worse?",
       "terms": [
         "model routing",
         "cascade",
@@ -365,9 +370,9 @@
         "fallback",
         "utilisation"
       ],
-      "good": "Derives the cost ratio from first principles rather than guessing: decode cost per token tracks bytes of weights read, so the 8B model is roughly an order of magnitude cheaper per token than the 70B. Computes the blended figure for a 70/30 split and compares it to the 1.50 ceiling, so the routing decision is made against a number. Designs the router as a cheap classifier or a cascade with an escalation path, and is explicit that the escalation rate is the cost control knob. The measurement answer is the discriminating part: the thing to watch is per-segment quality and escalation rate, not aggregate quality, because a 70 percent-correct router can hold average quality flat while destroying one segment. Proposes shadow traffic before a cutover.",
-      "bad": "Routes on prompt length or another cheap proxy for difficulty, and measures aggregate quality. Both halves are real: length is the proxy everyone reaches for and it correlates weakly with the difficulty of the response, and aggregate quality is the metric that hides the damage, because the 30 percent of traffic that was misrouted is averaged against the 70 percent that was fine. The other common failure is pricing the models by list price per token rather than by what the fleet actually costs, which makes the ceiling unverifiable.",
-      "model_answer": "First the cost shape, because it sets how hard the router has to work. Decode is memory-bandwidth bound, so cost per token roughly tracks weight bytes read: the 8B model is about an order of magnitude cheaper per token than the 70B, and the 400B is several times worse again. If I serve 70 percent on the small model, blended cost falls to roughly 0.7 times a tenth plus 0.3 times one — about 37 percent of serving everything on the 70B. That tells me the dollar fifty ceiling is reachable, with room to spare. So: route with a small cheap classifier, cascade to the larger model on low confidence, and treat the escalation rate as the cost dial. The measurement is where I would be careful — quality per traffic segment and escalation rate, not aggregate quality, because a router that is 70 percent right can hold the average flat while making one segment much worse. I would shadow it before cutting over.",
+      "good": "Derives the cost ratio from first principles — decode cost tracks weight bytes read, so the 8B is roughly an order of magnitude cheaper per token than the 70B and the 400B several times more expensive. Computes the blend against the stated $2.60 baseline rather than against an unstated one, so the comparison to the $1.50 ceiling is actually derivable. The discriminating move is noticing that the small share on the largest model dominates the bill: a few percent on the 400B outweighs the whole 70 percent saving on the 8B, so the binding lever is the 400B escalation rate, not the 8B share, and the threshold that follows is a 400B share under roughly 4 percent. Treats escalation rate as the cost control. On measurement, tracks quality per traffic segment and escalation rate rather than aggregate quality, because a partly-wrong router holds the average flat while destroying one segment. Proposes shadow traffic before a cutover.",
+      "bad": "Routes on prompt length or another cheap proxy for difficulty and measures aggregate quality. Both halves are real: length is the proxy everyone reaches for and it correlates weakly with the difficulty of the response, and aggregate quality is the metric that hides the damage, because the misrouted minority is averaged against the majority that was fine. The specific arithmetic failure is optimising the 8B share while ignoring the 400B's: with a 5x cost multiplier, a few percent of traffic on the largest model can exceed the entire saving from the small one, so a candidate who only tunes the 70 percent never reaches the ceiling.",
+      "model_answer": "Cost per token roughly tracks weight bytes read, so relative to the 70B the 8B is about a tenth and the 400B five to six times more. Baseline is two sixty. Send 70 percent to the 8B, 25 to the 70B and 5 to the 400B: the blend is 0.7 times 0.1, plus 0.25, plus 0.05 times 5.7 — about 0.6 of baseline, so roughly one fifty-seven. Over the ceiling, and the interesting part is why: the 5 percent on the 400B costs four times what the whole 70 percent on the 8B saves. So the lever is the 400B's share, not the small model — I need it under about 4 percent. I would route with a cheap classifier, cascade on low confidence, and treat the 400B escalation rate as the cost dial. Measure quality per traffic segment and escalation rate, not aggregate quality, because a router that is 70 percent right holds the average flat while wrecking one segment.",
       "followups": [
         {
           "if": "no number produced",
@@ -382,11 +387,11 @@
           "probe": "Average quality is flat and support tickets are up 40 percent. What happened?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_1",
           "probe": "The router itself adds 30 milliseconds. Where does that come from in the budget?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_2",
           "probe": "Finance halves the ceiling. What do you change — the split, the models, or the product?"
         }
       ]
@@ -418,7 +423,7 @@
       "followups": [
         {
           "if": "no number produced",
-          "probe": "How many GPUs, and what does it cost a day? I need a figure to take to my lead."
+          "probe": "I need a figure to take to my lead. What is it?"
         },
         {
           "if": "refuses on cost without a number",
@@ -429,11 +434,11 @@
           "probe": "What is our flake rate, and what happens to the merge queue when the gate trips?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_1",
           "probe": "I will take sampling on commit. How do you pick the sample so it is not useless?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_2",
           "probe": "Who gets billed for this, and can you attribute it per team?"
         }
       ]
@@ -459,9 +464,9 @@
         "signal to noise",
         "onboarding ramp"
       ],
-      "good": "Answers in the VP's units — months, money, and whether the model gets better — not in ML vocabulary. Translates kappa 0.62 into a plain statement: on a meaningful share of comparisons two trained annotators disagree, so some fraction of the data is noise, and doubling the pool doubles the noise alongside the signal. Makes the leverage argument quantitatively: raising agreement is worth more than raising volume, because effective sample size depends on both. Does not simply say no — gives the sequence (fix guidelines and adjudication against a gold set, then scale) with a rough timeline. Notes the second-order cost: 120 new annotators dilute agreement further during onboarding, so the first effect of doubling is that quality drops.",
-      "bad": "Explains Cohen's kappa to the VP. This is the real and extremely common failure — it is accurate, it is responsive, and it loses the room, which on this axis is the whole measurement. The engineering failure underneath is accepting the framing that volume is the constraint: the team doubles headcount, agreement falls further because the new cohort is unramped, and the extra data does not move the model, which is then read as the data strategy having failed.",
-      "model_answer": "We can double the pool, but I do not think we would get double the useful data, and I would rather spend the headcount somewhere better. Right now, when two of our trained annotators look at the same comparison, they disagree often enough that a real slice of what we collect is closer to coin-flip than signal. Doubling the team doubles both the signal and the noise, so the model sees maybe 200,000 comparisons' worth of usable preference even though we paid for 400,000 — and for the first couple of months it would be worse than that, because 120 new annotators are unramped and would pull agreement down further. What I would do instead is spend about six weeks tightening the guidelines and adjudicating against a gold set. If we lift agreement meaningfully, every comparison we already collect gets more valuable, including the 200,000 a month we have today. Then doubling the pool is worth doing, and I would come back and ask for it.",
+      "good": "Answers in the VP's units — months, money, whether the model improves — not in ML vocabulary. Crucially, does NOT claim that agreement work beats volume on effective sample size: doubling the pool does roughly double usable data, and a candidate who denies that is wrong. The correct argument is about sequencing and compounding: a kappa improvement raises the value of every comparison collected afterwards, including the doubled pool's, so doing agreement first and volume second strictly dominates the reverse order. Names the second-order cost — 120 unramped annotators dilute agreement before they add throughput. Gives a timeline and commits to returning with a number.",
+      "bad": "Explains Cohen's kappa to the VP. Accurate, responsive, and loses the room, which on this axis is the whole measurement. The substantive failure is the one that sounds sophisticated: arguing that raising agreement is worth MORE than doubling volume. It is not, on effective sample size — lifting kappa from 0.62 to 0.80 buys about 1.3x while doubling the pool buys 2x. A candidate who makes the stronger claim is both wrong and checkable, and a VP who later checks it stops trusting the next estimate.",
+      "model_answer": "You are right that doubling the pool roughly doubles the usable data — I do not want to pretend otherwise. My argument is about order. At a kappa of 0.62, a meaningful slice of every comparison we buy is closer to a coin flip than a signal, so we are paying for 200,000 a month and banking materially less. That waste applies to everything we collect from here on. Six weeks of tightening the guidelines and adjudicating against a gold set lifts the value of every future comparison by roughly a quarter to a third — including all 400,000 a month from the bigger pool. Do it the other way round and we pay twice for the same noise, and it is worse than that short-term, because 120 unramped annotators pull agreement down further before they lift throughput. So: six weeks on agreement, then double the pool, and I will come back and ask for the headcount with a number attached.",
       "followups": [
         {
           "if": "explains kappa",
@@ -476,11 +481,11 @@
           "probe": "How long does your alternative take, and what do I get at the end?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_1",
           "probe": "What agreement number would make you comfortable scaling?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_2",
           "probe": "Could a model do the first pass and humans only adjudicate? What breaks?"
         }
       ]
@@ -506,13 +511,13 @@
         "read bandwidth",
         "reproducibility"
       ],
-      "good": "Separates the three requirements, because they fail for different reasons and one of them is cheap: reproducibility is not a data-processing problem at all, it is a manifest and seed problem, and it is fixable in days rather than weeks. Says what reproducibility actually requires — content-addressed immutable shards plus a recorded manifest, seed, and ordering function — so the same batch sequence can be regenerated without storing it. Treats the shuffle as an I/O budget rather than an algorithm: a global shuffle of 4 petabytes means moving 4 petabytes, which bounds how often it can be done, so shuffling once into shards plus cheap in-shard shuffling per epoch is the design. Does the read-bandwidth arithmetic for 2,000 readers. Names the trust problem as a verification gap and proposes a measurable check rather than a better algorithm.",
+      "good": "Separates the three requirements, because they fail for different reasons and one is cheap: reproducibility is a manifest-and-seed problem, not a data-processing one, fixable in days. Treats the shuffle as an I/O budget and gets the budget right — a global shuffle READS and WRITES the corpus, so 4PB of data is 8PB of movement. Distinguishes corpus-scale I/O from the bandwidth the GPUs actually need to stay fed, which is orders of magnitude smaller because tokens are small; the binding term on the training read path is access pattern and IOPS, not bytes per second. Names the trust problem as a missing measurement rather than a worse algorithm. Leaves dedup last because it runs once per corpus version.",
       "bad": "Optimises the nine-day dedup job first, because it is the biggest visible number. It is the wrong first move: dedup runs once per corpus version, nine days is survivable, and meanwhile the untrusted shuffle and the missing reproducibility are silently contaminating every run and every comparison between runs. The specific technical failure is implementing the shuffle as a per-epoch global operation, which quietly requires moving petabytes every epoch and is the usual reason a data pipeline cannot keep 2,000 GPUs fed.",
-      "model_answer": "These are three requirements with three different failure modes, and the nine days is the least urgent of them. Reproducibility is the cheapest and most valuable fix: content-address the shards so they are immutable, then record the manifest, the seed, and the ordering function with the run. That regenerates the exact batch sequence six months later without storing it, and it is days of work, not weeks. Second, the shuffle. A true global shuffle of 4 petabytes means writing 4 petabytes — at even 100 gigabytes a second of sustained I/O that is on the order of 11 hours, so it is not something you do every epoch. I would shuffle once into shards at ingest and do cheap in-shard shuffling plus shard-order randomisation per epoch, which is where the trust problem probably comes from: nobody has measured the resulting distribution. I would add a verification job that samples it. Dedup I would leave at nine days and move it off the critical path, because it runs once per corpus version, not once per run.",
+      "model_answer": "Three requirements, three failure modes, and the nine days is the least urgent. Reproducibility is cheapest: content-address the shards so they are immutable, then record the manifest, the seed and the ordering function with the run. That regenerates the exact batch sequence six months later without storing it — days of work. Second, the shuffle, and which number matters. A global shuffle of 4 petabytes reads 4 and writes 4, so it moves 8; at 100 gigabytes a second that is about 22 hours. That is what says 'not every epoch'. It is not what the 2,000 GPUs need to stay fed, which is orders of magnitude smaller — tokens are tiny, so the training read path is an IOPS and access-pattern problem, not a bandwidth one. So: shuffle once into shards at ingest, then in-shard shuffling per epoch. The distrust is probably nobody having measured the distribution, so I would add a verification job. Dedup stays at nine days, off the critical path.",
       "followups": [
         {
           "if": "optimises dedup first",
-          "probe": "How often does dedup run compared to how often you train?"
+          "probe": "What is the cadence of each of those three jobs?"
         },
         {
           "if": "proposes a per-epoch global shuffle",
@@ -523,11 +528,11 @@
           "probe": "How much storage is that for a run, and for the 40 runs you compare?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_1",
           "probe": "A shard is found to be corrupt three months after the run. What can you say about the run?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_2",
           "probe": "2,000 GPUs are at 60 percent utilisation waiting on data. Where is the bottleneck?"
         }
       ]
@@ -570,11 +575,11 @@
           "probe": "You compressed 60-fold. What is recall at 10 now, and how do you know?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_1",
           "probe": "A full rebuild takes 30 hours and you have daily churn. What is your freshness guarantee?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_2",
           "probe": "Halve the machine budget. Do you give up recall or latency?"
         }
       ]
@@ -614,14 +619,14 @@
         },
         {
           "if": "treats it as a rare edge case",
-          "probe": "One in five turns hits this. Is it still an edge case?"
+          "probe": "Is this a rare path or a common one? What decides that?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_1",
           "probe": "The email provider has no idempotency support. Now what?"
         },
         {
-          "if": "at bar",
+          "if": "at_bar_2",
           "probe": "How would you have caught this in production before finance did?"
         }
       ]

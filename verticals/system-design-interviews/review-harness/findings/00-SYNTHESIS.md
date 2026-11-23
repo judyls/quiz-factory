@@ -147,6 +147,16 @@ latent on these five answers rather than absent.
 
 ## 7. Defect queue, ranked
 
+> **STATUS 2026-11-23: items 1-9 fixed in the commit that follows this run.** Item 10
+> (the `communication_collaboration` bias question) is deliberately NOT fixed — it needs a
+> human, and these reviewers are the wrong instrument for it. Details of each fix are in
+> the commit message; the queue is left as written so the findings can be audited against
+> what was actually changed.
+>
+> One fix caught a further error of my own: the rewritten fleet-routing answer and plant 09
+> both initially stated a 3% threshold where the arithmetic gives 4.4%. That is exactly what
+> the new numeric-truth check in `prompts.md` exists to catch, and it caught its author.
+
 **Blocking any public score or level claim:**
 
 1. **C4 — specify per-axis aggregation.** The level mapping consumes a number the pack never
