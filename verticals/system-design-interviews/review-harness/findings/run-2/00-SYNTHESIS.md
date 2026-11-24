@@ -232,3 +232,88 @@ Item 12 is unchanged and deliberately so. Both cells of that axis came back unan
 run, which says the cell is *clear*, not that it is *fair*. Five models sharing a training
 distribution cannot answer the fairness question, and a unanimous score is exactly what
 shared blind spots look like.
+
+---
+
+## 6. Queue worked — status
+
+Eleven of twelve closed. Item 12 remains open on purpose.
+
+| # | Item | Status |
+| --- | --- | --- |
+| 1 | Propagate Appendix B's corrections | **fixed** — and the sweep found 4 places no reviewer named, including two fixtures and the grader's own schema example |
+| 2 | Plant 10 vs its model answer | **fixed** — now generated from the model answer, and `validate.py` fails if it ever diverges again |
+| 3 | The self-contradicting throughput sentence; the missing shuffle derivation | **fixed** — Appendix B now carries a shuffle block with both corpus scales |
+| 4 | `tradeoff` band-2 regression | **fixed** — band 2 now requires *the binding* trade-off, a side, **and** what that side gives up |
+| 5 | No retraction rule | **fixed** — content axes score the final state, with revision (reason supplied) distinguished from retraction (none supplied) |
+| 6 | Bands 0 and 1 undeclared | **fixed differently than queued** — see below |
+| 7 | The Numeric-truth check | **fixed** — split into three checks; the new one tests the *model*, via per-item `required_terms` |
+| 8 | The level claim | **cut** |
+| 9 | Re-cost `eval-infra` | **fixed** — ~$690k on-demand, ~$2.5M reserved, elasticity stated |
+| 10 | Training-infra coverage | **recorded** in `02-CONTENT-AGENT.md` as a limitation of what shipped, with four replacement scenarios named |
+| 11 | Scenario-validity items | **fixed** — ledger, dedup, agent-retry, batch-window |
+| 12 | `communication_collaboration` bias | **open — for a human** |
+
+### Item 6 was not fixed the way it was queued
+
+The queue said "declare required clauses for bands 0 and 1", by analogy with the band-3 and
+band-2 fixes. Writing it that way made the error visible: **band 1 is not a set of
+conditions.** It is what is left when band 2's required clause is unmet. Giving it required
+clauses would have created a third conjunction — the same defect a third time, which is the
+pattern run 2 recorded as the third prior.
+
+So the fix is a precedence rule instead. Band 0 is one declared test per axis, about absence
+only. Bands 3 and 2 are decided by their required clause. **Band 1 is the residual, and its
+listed behaviours are explicitly marked as worked examples that must never be checked to
+decide a score.** `validate.py` now asserts exactly six of each marker, and asserts that
+band 1 has *not* acquired conditions.
+
+That also predicts where run 3's disagreement should go. If the third prior is right, the
+contested cells should move to the 2/3 boundary — the one both earlier priors expected and
+neither found.
+
+### Two scenarios got better rather than merely correct
+
+- **`batch-window-vs-ttft-budget`** was not wrong, it was **underspecified**: it never said
+  how a batch departs. Adding a one-second fill timeout makes its three stated numbers
+  reconcile to within 2% (1s wait + a 178ms prefill = 1,178ms against the stated 1.2s p99,
+  with half-full departures explaining 45% utilisation) — and it sharpens the item, because
+  the discriminating insight becomes "the batch is departing on the timeout, so you pay the
+  whole wait and get none of the throughput". The model answer now also budgets against
+  prefill rather than the decode floor, which is a ~15× larger term at 2k context.
+- **`gpu-credit-ledger-consistency`** now answers the exposure question properly. The $11
+  lease bound holds only while the ledger is reachable; fail open through a ten-minute
+  outage on a 2,000-GPU fleet and it is ~$670 and accruing. Two orders of magnitude, and the
+  prompt no longer pre-states that 150ms is affordable.
+
+### What this run cost, and what it bought
+
+Four of the nine convergent defects were introduced or left behind by run 1's own fixes.
+That is the honest summary of iterating on a rubric with a harness: each pass finds real
+defects and plants a smaller number of new ones, and the only reason this is visible is that
+the fixtures and the agreement measurement are kept across runs. The ratio is improving —
+run 1 found 9 against a pack with no self-tests, run 2 found 9 against a pack with two
+layers of them — but it is not zero and should not be reported as converged.
+
+### Plant 10 caught a second thing, which is what it is for
+
+Its scores came back `high_level_design` **3** (unanimous) and `deep_dive_failure_modes`
+**2** (four of five), against an expected 3 and 3. Its own `known_defect_probed` says what a
+2 means: *"the model answers are not written to the band they are supposed to teach, and
+every grade anchored on them will be pulled low."*
+
+Checking it against the cell, the reviewers were right. Band 3 requires a failure mode the
+candidate found **that changed the design**, and the old answer had none — its design moves
+were driven by a requirement (reproducibility) and a cost (the shuffle), both legitimate and
+neither a failure mode. The answer was a band-2 answer sitting in the slot that teaches
+band 3.
+
+Fixed by adding the failure mode that lives in the design the answer itself proposes: shards
+built in crawl order make in-shard shuffling return the same neighbourhoods every epoch, so
+batches stay correlated while the loss curve looks healthy. That changes the design
+(randomise shard assignment at ingest, not only within shards) and names the signal that
+would reveal it.
+
+This is the fixture doing exactly its job, on the second run, against a model answer that
+had already been corrected once. It is also the reason `plant-10` is worth the awkwardness
+of being generated rather than written.

@@ -287,8 +287,12 @@ Output JSON matching the schema exactly. No prose outside the JSON.
       "assessed": true,
       "score": 0,
       "derivation_steps": [
-        {"inputs": "140 GB weights, 13.4 TB/s aggregate", "op": "140/13400", "result_stated": "10ms"}
+        {"inputs": "140 GB weights + 21 GB KV at batch 32 x 2k", "units": "GB",
+         "divisor": "13.4 TB/s aggregate", "op": "(140+21)/13400", "result_stated": "12ms"}
       ],
+      "terms_present": ["weights", "kv"],
+      "candidate_arithmetic_error": null,
+      "retracted": false,
       "evidence_quote": "verbatim candidate text",
       "evidence_timestamp_ms": 0,
       "addresses_prompt": true,
@@ -325,13 +329,29 @@ only in the prompt is not a cap; this table is the actual anti-flattery mechanis
 | Minimum criticism | fewer than 2 `below_bar_observations` ⇒ reject and re-ask |
 | Axis set | any axis scored that is not in `axes_to_score` ⇒ reject |
 | Contrast coverage | reject if `contrast.at_bar_answer` does not cover at least one beat from `<reference>.good` that the candidate missed, or if it contains a verbatim span of 8+ words from the candidate's transcript |
-| **Numeric truth** | any axis scored 2 or 3 on the strength of a quantity must carry `derivation_steps` that **code recomputes**. If the stated result does not follow from the stated inputs, reject — the grader scored the *form* of arithmetic without checking it |
+| **Grader arithmetic** | every `derivation_steps` entry must recompute from its own stated inputs to within **±5%**, with `units` present on inputs and result. A mismatch means the *grader* wrote arithmetic it did not check ⇒ reject and re-ask. **This check is about the grader, never about the candidate** |
+| **Model completeness** | for any item declaring `required_terms`, the grader reports `terms_present` — which of those terms the candidate's derivation actually contained. A missing term **caps the axis at 2** (an incomplete model cannot be band 3) and is recorded, but **does not reject**. This is the check the first version did not have: all four errors it was written to catch were omitted terms whose arithmetic was internally consistent, so recomputation passed every one of them |
+| **Candidate arithmetic** | where the candidate's own figure does not follow from their own inputs, the grader sets `candidate_arithmetic_error` with the recomputation and **scores the band accordingly** — >100× unnoticed is band 1, within ~2–3× is band 2. It must **never** reject. A validator that fails the grader for a candidate's bad arithmetic is unsatisfiable on exactly the transcripts the rubric most needs to score, and the first thing an on-call engineer does with an unsatisfiable gate is switch it off |
 | Numeric consistency | reject a `band3_consequence` whose threshold or conclusion contradicts the candidate's own figures elsewhere in the transcript |
 | Versioning | `grader_version` stamped on every row, always |
 
 **Reject-and-re-ask, not repair.** Silently clamping a bad output teaches nothing and hides
 how often the grader misses. Log every rejection with its reason; the rejection rate per
 check is a live quality signal and belongs in `METRICS.md`.
+
+### Why `required_terms` and not a tighter recomputation
+
+The four arithmetic errors this pack has found in its own material were all the same shape:
+a formula missing a term, applied correctly. `140/13,400` is exactly 10.4ms — the arithmetic
+is flawless and the model is wrong, because a decode step also reads the batch's KV. Same
+for prefill without the attention term, and a shuffle counting writes but not reads.
+
+No recomputation check can catch that, because there is nothing to recompute incorrectly.
+What catches it is knowing, per item, which terms a complete derivation contains — so each
+item that has a load-bearing derivation declares `required_terms`, and the grader reports
+which were present. A candidate who omits one is not wrong about arithmetic; they are
+working with an incomplete model, which is the difference between band 2 and band 3 on
+`capacity_cost_estimation`, and the cap encodes exactly that.
 
 ### Two things the first version of this table could not do
 
