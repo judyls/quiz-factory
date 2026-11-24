@@ -317,3 +317,77 @@ would reveal it.
 This is the fixture doing exactly its job, on the second run, against a model answer that
 had already been corrected once. It is also the reason `plant-10` is worth the awkwardness
 of being generated rather than written.
+
+---
+
+## 7. Addendum — one live human test, three more defects
+
+Run 2026-11-24, after the queue above was closed. Not part of the harness: one person, one
+item drawn at random, answered out loud against a 60-second timer with nothing to look up.
+It took about twenty seconds and produced a band-1 answer. It also found three item defects
+the five reviewers did not.
+
+**The answer, in full:** *"Okay, we want to have the input as a variable, and the output is
+2,000 tokens. We have a judge call that we don't know how big that is, but it's 50,000 calls
+of this. Each one is like 2 LLM calls to 100,000. That we need to do in 10 minutes, which
+means 10,000 per minute. That's a lot of phone calls."*
+
+Scored against the rubric as written: `requirements_scoping` **1**,
+`capacity_cost_estimation` **1**. One real derivation (100,000 calls → 10,000/min, correct),
+no binding constraint named, no cost produced, pushback never reached.
+
+**But it stopped because the item ran out of information, not because the speaker did.** The
+two things flagged in the first eight words — input length, judge size — are both genuinely
+absent from `eval-infra-per-commit-cost`, and the judge call is 36–52% of the work. My model
+answer waved at it with the words "plus judge calls" and costed neither. Run 1 had flagged
+exactly this as defect C3 with three reviewers; I fixed the other half of C3 (fleet pricing)
+and left the judge calls untouched through two queues.
+
+Corrected: the item now states a 500-token prompt and a judge that reads 2,500 and writes
+200. The honest cost is **243 GPUs, ~$81 a commit, ~$1.18M a year** — the previous figure was
+**1.7–2.4× low**, because it counted generation output only. Prefill is a third of the work,
+which stings given Appendix B had just been rewritten about prefill being the term everyone
+drops.
+
+### The audit this triggered, and what it found
+
+Four other items leaned on six or more figures absent from their prompts. The crude count
+over-flags, because most such figures are *derivations* (140GB from "70 billion parameters in
+bfloat16") and deriving them is the skill being measured. The test that matters is narrower:
+**is there a value the candidate cannot obtain, and would a different plausible value change
+the conclusion?**
+
+| Item | Unstated | Material? |
+| --- | --- | --- |
+| `eval-infra-per-commit-cost` | judge size, input length | **yes** — 1.7–2.4× on the cost |
+| `batch-window-vs-ttft-budget` | context length | **yes** — at 20k tokens prefill is 2.1s and the 400ms target is *impossible*, so the premise inverts |
+| `gpu-credit-ledger-consistency` | fleet size | **yes** — the outage exposure is entirely a function of it ($670 at 2,000 GPUs, $6,670 at 20,000). **I introduced this one in the commit immediately before the test** |
+| `kv-cache-admission-control` | tensor-parallel degree | minor — the per-card figure implied TP=4 and the prompt gave 8-card nodes |
+| `heterogeneous-fleet-routing` | — | clean. Every figure derives from the prompt's parameter counts |
+
+All four fixed by stating the value in the prompt. I had guessed "one or two of the four are
+real"; it was three, plus one minor. Recording the wrong guess because the pattern across
+this session is that my estimates of how much is broken run low.
+
+### Why the harness could not find this
+
+A reviewer given an underspecified item **completes it from its own priors and does not
+notice.** Five reviewers each silently picked a plausible judge size and scored on; two of
+the three broken items were scored *unanimously*, which is the part worth sitting with —
+unanimity measured agreement about a question nobody could actually answer.
+
+A human with a mouth, a timer and nothing to look up cannot do that. The gap is the first
+thing they hit.
+
+This is a structural limit of model review, not a flaw in the personas, and it is now
+recorded in the harness README. It also sets the cheapest next test: **the other eleven items
+need a human to attempt them out loud, one pass each.** That is well under an hour and, on
+today's evidence, worth more per minute than a third harness run.
+
+### One open design question this raises
+
+`requirements_scoping` band 3 rewards *"asked the one question whose answer would most change
+the architecture"* — a behaviour the 60-second diagnostic structurally cannot permit, because
+there is nobody to ask. The axis may be only partly measurable in the diagnostic and need its
+real measurement in the 45-minute mock. Flagged, not acted on: it needs more than one item's
+evidence, and it is a decision about the instrument rather than a defect in a file.

@@ -75,11 +75,11 @@
     {
       "id": "plant-04-correct-but-mute",
       "targets": "eval-infra-per-commit-cost",
-      "attacks": "Halo effect. Technically excellent cost arithmetic, delivered as an unstructured dump that never addresses the person asking and silently answers only half the question. Strong content must not inflate the communication score.",
+      "attacks": "Halo effect. Technically excellent cost arithmetic, delivered as an unstructured dump that never addresses the person asking and silently answers only half the question. Strong content must not inflate the communication score. Re-derived after a live test found the item did not size the judge call or the input: this fixture's premise is that the arithmetic is right, so an incomplete derivation breaks it as surely as a wrong one.",
       "transcript": [
         {
           "speaker": "candidate",
-          "text": "Okay so 50,000 times 2,000 is 100 million tokens. Divided by 600 seconds that is 166,666 tokens per second. A four-H100 replica does maybe 4,700 tokens a second so that is 35.5 replicas, call it 36, times 4 is 144 GPUs. At 2 dollars a GPU-hour for ten minutes that is 24 GPU-hours, so 48 dollars. Times 40 commits is 1,920 dollars a day. Annualised that is 700,800 dollars. The judge calls add more depending on which judge model. There is also cold start on the replicas which I have not accounted for, and sharding overhead. Storage for the results is negligible. Network egress depends on where the judge runs."
+          "text": "Okay so 50,000 times 2,000 is 100 million output tokens, plus the judge at 200 each is 10 million more, so 110 million. Input is 500 plus 2,500 for the judge, times 50,000, so 150 million. Output at 4,700 a second is 23,335 replica-seconds. Input is 2 times 70 billion times 150 million over 1.6 petaflops, 13,125. Total 36,460. Over 600 seconds that is 60.8 replicas, times 4 is 243 GPUs. At 2 dollars a GPU-hour for ten minutes that is 40.5 GPU-hours, 81 dollars. Times 40 commits is 3,241 dollars a day. Annualised that is 1,182,916 dollars. The cold start on the replicas I have not accounted for. Storage for the results is negligible. Network egress depends on where the judge runs."
         }
       ],
       "required_outcome": {

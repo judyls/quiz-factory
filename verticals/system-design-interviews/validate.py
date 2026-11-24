@@ -40,7 +40,9 @@ RETRACTED = [
     (r"most(ly)? (of which is |)(already |)holding weights", "implies >50%; weights are 35GB of each 80GB card (44%)"),
     (r"on the order of 11 hours|about 11 hours", "shuffle counting writes only; a global shuffle moves 2xS, so ~22h"),
     (r"(~|about |roughly )9 seconds", "prefill omitting attention FLOPs; corrected is ~17s at 100k"),
-    (r"half a million a year|544,580", "eval-infra annual cost at the stale throughput; corrected is ~$690k"),
+    (r"half a million a year|544,580", "eval-infra annual cost at the stale throughput"),
+    (r"141 GPUs", "eval-infra fleet counting generation output only; with the judge call and prefill it is ~243"),
+    (r"690,000|\$0\.69M", "eval-infra annual cost before the judge call and prefill were counted; ~$1.18M"),
 ]
 
 # Fixtures whose premise is that they reproduce another string exactly. Checked, not trusted.
@@ -118,7 +120,7 @@ def main() -> int:
                 # to show what was wrong. Those quotations are always adjacent to a marker.
                 if re.search(r"not the|rather than|stale|superseded|retracted|first version|"
                              r"corrected|wrong|would be|instead of|run 2 found|was stated as|"
-                             r"omitt|implies|it is \*\*", ctx, re.I):
+                             r"omitt|implies|it is \*\*|counting only|gives", ctx, re.I):
                     continue
                 bad(f"{fname}: retracted figure {m.group(0)!r} reappears — {note}\n      ...{ctx}...")
 

@@ -71,7 +71,7 @@
         "capacity_cost_estimation",
         "tradeoff_articulation"
       ],
-      "prompt": "We serve a 70-billion-parameter model on replicas of four H100s. Our p99 time-to-first-token target is 400 milliseconds. Right now we use a fixed batch size of 32 with a one-second fill timeout, so a batch departs when it is full or when the timeout expires, whichever comes first. p99 time-to-first-token is sitting at 1.2 seconds, and the GPUs are only 45 percent utilised. Both numbers are bad at the same time. What do you change first, and what number tells you it worked?",
+      "prompt": "We serve a 70-billion-parameter model in bfloat16 on replicas of four H100s, sharded four ways. Requests carry about 2,000 tokens of context. Our p99 time-to-first-token target is 400 milliseconds. Right now we use a fixed batch size of 32 with a one-second fill timeout, so a batch departs when it is full or when the timeout expires, whichever comes first. p99 time-to-first-token is sitting at 1.2 seconds, and the GPUs are only 45 percent utilised. Both numbers are bad at the same time. What do you change first, and what number tells you it worked?",
       "terms": [
         "continuous batching",
         "static batching",
@@ -123,7 +123,7 @@
         "requirements_scoping",
         "capacity_cost_estimation"
       ],
-      "prompt": "Same 70-billion-parameter model, eight nodes of eight H100s. 95 percent of requests carry about 2,000 tokens of context; 5 percent carry about 100,000. At the daily peak, the long requests push the short ones out of cache and p99 time-to-first-token on the short traffic triples. Before you design anything: what exactly are you protecting, and what is the first number you would want?",
+      "prompt": "Same 70-billion-parameter model in bfloat16, eight nodes of eight H100s, sharded four ways per replica. 95 percent of requests carry about 2,000 tokens of context; 5 percent carry about 100,000. At the daily peak, the long requests push the short ones out of cache and p99 time-to-first-token on the short traffic triples. Before you design anything: what exactly are you protecting, and what is the first number you would want?",
       "terms": [
         "KV cache",
         "admission control",
@@ -224,7 +224,7 @@
         "deep_dive_failure_modes",
         "tradeoff_articulation"
       ],
-      "prompt": "An internal GPU credit system. 400 research teams, credits debited per GPU-second, and 20 schedulers admitting jobs. Jobs must start in under 2 seconds. A strongly consistent ledger check adds about 150 milliseconds to admission, and puts the ledger in the path of every job start. What consistency model do you pick, and what is the exposure if you are wrong?",
+      "prompt": "An internal GPU credit system on a 2,000-GPU cluster. 400 research teams, credits debited per GPU-second, and 20 schedulers admitting jobs. Jobs must start in under 2 seconds. A strongly consistent ledger check adds about 150 milliseconds to admission, and puts the ledger in the path of every job start. What consistency model do you pick, and what is the exposure if you are wrong?",
       "terms": [
         "lease",
         "overdraft",
@@ -427,7 +427,7 @@
         "requirements_scoping",
         "communication_collaboration"
       ],
-      "prompt": "I am a research engineer and I want 50,000 graded evaluations on every commit. We land about 40 commits a day. Each evaluation is one 2,000-token generation plus a judge call. I want results in under 10 minutes so it can gate merges. Tell me what that costs, and tell me what you would push back on.",
+      "prompt": "I am a research engineer and I want 50,000 graded evaluations on every commit. We land about 40 commits a day. Each evaluation is one generation of about 2,000 output tokens from a 500-token prompt, plus a judge call that reads the prompt and the output and writes about 200 tokens. I want results in under 10 minutes so it can gate merges. Tell me what that costs, and tell me what you would push back on.",
       "terms": [
         "throughput",
         "GPU-hours",
@@ -440,9 +440,9 @@
         "merge queue",
         "requirement negotiation"
       ],
-      "good": "Produces the capacity number before the opinion, because the number is the argument: 50,000 evaluations times 2,000 tokens in 600 seconds is a sustained token rate that implies a specific fleet size, and that fleet size times 40 commits a day is a specific daily bill. Then pushes back on the requirement rather than the implementation: the 10-minute gate on every commit is the expensive clause, and it is the one that was never costed. Offers the cheaper shapes — sample on commit and run the full suite on merge, cache results keyed by anything the commit did not change, shard and early-abort on a decisive subset. Treats the researcher as a customer whose goal is real: asks what decision the gate is meant to make, because a flake-prone gate blocking 40 merges a day is worse than no gate. Keeps the register collaborative rather than obstructive.",
+      "good": "Costs the judge call rather than waving at it, and counts input tokens as well as output: the judge roughly doubles the bill, and prefill is a third of the work, so an answer that multiplies 50,000 by 2,000 and stops is out by about 2x. Produces the capacity number before the opinion, because the number is the argument: 50,000 evaluations times 2,000 tokens in 600 seconds is a sustained token rate that implies a specific fleet size, and that fleet size times 40 commits a day is a specific daily bill. Then pushes back on the requirement rather than the implementation: the 10-minute gate on every commit is the expensive clause, and it is the one that was never costed. Offers the cheaper shapes — sample on commit and run the full suite on merge, cache results keyed by anything the commit did not change, shard and early-abort on a decisive subset. Treats the researcher as a customer whose goal is real: asks what decision the gate is meant to make, because a flake-prone gate blocking 40 merges a day is worse than no gate. Keeps the register collaborative rather than obstructive.",
       "bad": "Says yes and builds it, or says no on cost without ever producing the number. Both are real and both are communication failures more than engineering ones. The specific technical failure under the 'yes' is not asking about the flake rate: at 50,000 evaluations per commit, even a very small nondeterministic failure rate means the gate blocks merges constantly, the team learns to override it, and the expensive infrastructure is then load-bearing for nothing.",
-      "model_answer": "Let me cost it before I argue with it. 50,000 evaluations at 2,000 tokens in 600 seconds is about 170,000 tokens a second. A four-H100 replica serving a 70B does about 4,700 tokens a second once KV reads are counted, so roughly 35 replicas, 141 GPUs, for ten minutes a commit, plus judge calls. At 2 dollars a GPU-hour that is about 47 dollars a commit, 1,900 a day, roughly 690,000 a year — and that assumes I can rent 141 H100s ten minutes at a time. Reserved for a 28 percent duty cycle it is nearer 2.5 million, so the elasticity assumption matters more than the arithmetic. What I would push back on is not the 50,000, it is 'every commit, gating merges, in 10 minutes', which is nearly all of the cost. Sample a few thousand on commit, full suite on merge, cache by content hash. And what is your flake rate?",
+      "model_answer": "Let me cost it properly, because the judge is not a footnote. Per evaluation: 2,000 output tokens generated, plus a judge reading 2,500 and writing 200. So about 110 million output tokens a commit and 150 million input tokens. Output is bandwidth-bound — at 4,700 tokens a second per four-H100 replica that is 23,000 replica-seconds. Input is compute-bound: 2 times 70 billion times 150 million is 21 exaflops, about 13,000 replica-seconds at realistic utilisation. So prefill is a third of the work and the judge is most of that. Total 36,000 replica-seconds in a 600-second window is 61 replicas, 243 GPUs, roughly 81 dollars a commit — 3,200 a day, 1.2 million a year, and that assumes I can rent them ten minutes at a time. Counting only the generation's output tokens gives 141 GPUs and half the bill. What I would push back on is 'every commit, gating merges, in 10 minutes', which is nearly all of the cost: sample on commit, full suite on merge, cache by content hash. And what is your flake rate?",
       "followups": [
         {
           "if": "no number produced",
@@ -466,9 +466,12 @@
         }
       ],
       "required_terms": [
-        "token_rate",
-        "replica_throughput",
-        "gpu_hours",
+        "generation_output_tokens",
+        "generation_input_tokens",
+        "judge_input_tokens",
+        "judge_output_tokens",
+        "decode_throughput",
+        "prefill_cost",
         "price_per_gpu_hour",
         "elasticity_assumption"
       ]

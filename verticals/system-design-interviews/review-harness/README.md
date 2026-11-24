@@ -29,6 +29,13 @@ Read this before acting on anything in `findings/`.
 - Whether the level-mapping thresholds match any real level.
 - Whether band 1 reads as insulting to someone who just failed a loop.
 - Anything requiring a named company's actual practice.
+- **Whether an item is answerable at all.** This one was learned the hard way, after run 2.
+  A reviewer handed an underspecified item silently supplies a plausible value from its own
+  priors, scores the answer, and never notices it filled in a blank — so five reviewers
+  agreeing on a score is *not* evidence the item could be answered. A human attempting the
+  same item out loud, against a timer, with nobody to ask, hit the gap in twenty seconds.
+  Three of the pack's twelve items turned out to withhold a value that materially changed
+  the answer, and the harness had scored two of them unanimously.
 
 **Therefore:** treat the agreement measurement and the technical defects as real findings.
 Treat every claim about what interviews are like as a hypothesis to put to a human. The
