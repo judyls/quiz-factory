@@ -57,6 +57,19 @@ In the 45-minute mock, where there is room, expect the indicators to appear and 
 absence as the 2/3 discriminator. In the 60-second diagnostic, the required clause is the
 whole test.
 
+### Band 2 has ONE required clause too
+
+Same structure, and for a sharper reason: **band 2 is the band the level mapping actually
+reads.** Every row of the table above is a statement about which axes cleared 1.75 or 2.50,
+so an ambiguous band 2 miscalibrates the public level claim directly, while an ambiguous
+band 3 only affects the top of the scale.
+
+Fixing band 3's conjunction problem and leaving band 2 as an undeclared 3-to-5-clause
+conjunction moved the defect rather than removing it — all six band-2 cells had it, against
+one of six band-1 cells. Each band-2 cell below therefore names **Required** and
+**Indicators** explicitly. Indicators corroborate; their absence does not block a 2. If the
+required clause is absent, the score is 1 however many indicators are present.
+
 ### Relevance gates every content axis
 
 **A behaviour performed on the wrong problem scores at most band 1 on every axis, however
@@ -75,19 +88,140 @@ constraints before scoring any axis.
 answer's decision rests on. Code clamps the axis to ≤ 1 when `addresses_prompt` is false or
 the quoted constraint is not in the prompt. The gate tests the answer's **binding constraint
 and decision**, not its topic or vocabulary: a neighbouring scenario considered and rejected
-on the way to the right problem does not trigger it (plant 08b is the control).
+on the way to the right problem does not trigger it. The over-firing case has its own
+negative-control fixture; which one it is stays in `calibration-plants.json`, because
+describing a fixture in a file reviewers read de-blinds anyone asked to score it.
 
-### Composite and level mapping
+### Band precedence — how a band is chosen
 
-Axis scores are not averaged into a single number for the user-facing level claim. The
-composite is `mean(axis_scores)` for the percentile, but the **level claim** uses the
-profile shape, because that is how real loops read a scorecard:
+Bands 3 and 2 each declare one required clause. Bands 0 and 1 did not, and run 2 of the
+review harness found 4 of 14 contested cells sitting on the 0/1 and 1/2 lines rather than
+the 2/3 line this rubric had spent two revisions on. Adding required clauses to bands 0 and
+1 would be the obvious fix and it is the wrong one: band 1 is not a set of conditions a
+candidate meets, it is **what is left when band 2's required clause is not met.**
 
-| Level claim | Rule |
-| --- | --- |
-| Below the senior bar | any axis at 0, or ≥3 axes at 1 |
-| At the senior bar | all axes ≥ 1, ≥4 axes ≥ 2, `tradeoff_articulation` ≥ 2 |
-| At the staff bar | ≥5 axes ≥ 2, ≥2 axes at 3, `tradeoff_articulation` ≥ 2, no axis at 0 |
+So the band is chosen by this order, and nothing else:
+
+```
+if band_0_test(axis) holds:               score = 0
+elif band_3 "Required" clause satisfied:  score = 3
+elif band_2 "Required" clause satisfied:  score = 2
+else:                                     score = 1
+```
+
+- **Band 0 is one declared test per axis, about absence and never about quality.** Each
+  band-0 cell below opens with `Band 0 only if:` and that clause is the whole test.
+- **Band 1 is the residual.** The behaviours listed in a band-1 cell are worked examples of
+  failing band 2, not additional tests. **Never check a band-1 clause to decide a score.**
+  If the behaviour is present and band 2's required clause is unmet, the score is 1 whether
+  or not the answer matches any listed example. The examples are there to make the write-up
+  concrete and to teach the judge what this failure looks like.
+- **Indicators never change a band.** They inform the written feedback only.
+
+This is why the file has exactly six `Band 0 only if:` tests and six `Required:` clauses per
+scored band, and why a cell that needs a conjunction to be decided is a defect report.
+
+### Retraction — an axis is scored on the answer's final state
+
+All five reviewers in run 2 independently named the same hardest cell: a candidate who
+derives a correct, band-3-shaped observation and then abandons it when pushed. Nothing said
+whether the axis took the best state or the final one, and the two readings are two bands
+apart.
+
+**The content axes are scored on the answer's final state.** If the candidate withdraws a
+component, a mitigation or a number, the axis is scored as though it was never offered —
+because the design they would actually leave the room with is the one being measured.
+
+With one distinction that matters, and that the judge must state:
+
+- **A revision** is a change made after the interviewer supplied a *reason* — new
+  information, a constraint the candidate had missed, a counterexample. This is the
+  behaviour the collaboration axis exists to reward. Score the final state as a genuine
+  decision, at whatever band it earns.
+- **A retraction** is a change made when no reason was supplied — the interviewer asserted a
+  preference, named a disagreeing third party, or simply pushed. The content axis takes the
+  final state, which will usually drop it to band 1 because band 2's required clause is no
+  longer met, **and** `communication_collaboration` scores the fold on its own terms (band
+  1: "abandoned a correct position under mild pushback").
+
+Both axes moving is correct, not double-counting: the fold is a communication failure *and*
+it leaves the design broken. The judge records `first_raised_by` and `retracted: true|false`
+per axis so this is auditable rather than inferred.
+
+### From item scores to an axis score — the aggregation rule
+
+**This rule was missing entirely until two reviewers independently found that the level
+claim below consumed a number the rubric never defined.** Without it the mapping is not
+computable: under a `mean` reading "any axis at 0" can essentially never fire, and under a
+`min` reading it fires for almost everyone. Specified here before the thresholds that use it.
+
+Bands are ordinal, so an axis score is kept **continuous** rather than re-bucketed into a
+band. Re-rounding to an integer throws away the distinction between an axis that scored
+1,1,1,1 and one that scored 0,1,1,3, and those are different findings.
+
+```
+axis_score[a] = mean( item_score[a][i]  for each item i that assessed axis a )
+```
+
+- Range 0.00–3.00, reported to 2 decimal places. **Never rounded to a band** for scoring,
+  percentile, or level. Round only for display on the scorecard, and show the mark position
+  continuously if the artifact allows it.
+- **Only assessed items count.** An item that does not score axis `a` contributes nothing —
+  it is not a zero. See the absence rule in [Appendix A](#appendix-a--the-judges-operating-instructions).
+- **Insufficient signal.** If fewer than 2 items assessed an axis (an abandoned attempt, a
+  future scenario set), the axis is reported as *insufficient signal* and is excluded from
+  the level claim rather than scored. It must not be silently treated as 0.
+- **The floor rule.** `axis_score = 0.00` can only arise when every assessed item scored 0,
+  which is the intended meaning of a zero axis: the behaviour never appeared anywhere it was
+  asked for. The mean produces this automatically; no special case is needed.
+- In the **45-minute mock** there is one scenario and all six axes are scored once, so
+  `axis_score[a]` is that single score. The thresholds below apply unchanged.
+
+The diagnostic has 12 items × 2 axes = 24 slots over 6 axes, **4 items per axis**, so each
+axis score is a mean of 4 values and can land on any multiple of 0.25.
+
+### What ships instead of a level claim
+
+**No level claim ships.** Not "at the senior bar", not "staff", not a composite percentile
+until the cohort exists. Ten of ten simulated reviewers across two runs declined to sign the
+level mapping while all ten signed the six axes, and run 2 found two defects that make the
+former unusable as written rather than merely uncalibrated:
+
+- **The staff row was unreachable.** Any profile satisfying it also satisfied the senior row,
+  which is evaluated first, so a top-down read could never return "staff". Verified by
+  exhaustive search over the threshold grid, not by inspection.
+- **The rows were not exhaustive.** `1.75, 1.75, 1.75, 1.60, 1.40, 1.40` matched no row at
+  all, despite the claim that top-down evaluation made the three exhaustive by construction.
+
+The second one is the instructive failure: the file *asserted* exhaustiveness as following
+from the evaluation order, and that assertion was simply false. A level mapping is a total
+function from six numbers to a label, and the only way to know it is total is to enumerate.
+
+**The reveal shows the profile, which needs no calibration to be honest:**
+
+- the six axis scores, continuous, 0.00–3.00, each with the quoted evidence behind it;
+- the lowest axis named as the blind spot, with the specific behaviour that was missing;
+- what an at-bar answer to the same item sounds like — the contrast, which is the product;
+- *no* composite, *no* percentile, *no* level, until `calibration-plan.md`'s Phase 3 gate is
+  met against hand-scored sessions.
+
+This costs the share artifact its status line, which is a real product cost and is the
+build agent's and GTM agent's call to make, not mine. I am flagging it rather than deciding
+it: the artifact can carry a profile shape without carrying a rank.
+
+> **The thresholds below are retained only as a hypothesis for `calibration-plan.md` to
+> test.** They are not a rule, nothing reads them, and they must not be implemented. Both
+> defects above are left visible on purpose, because the next person to propose a level
+> mapping should see what the last one got wrong.
+>
+> | Hypothesis | Rule once, on continuous axis scores |
+> | --- | --- |
+> | Below the senior bar | any axis < 1.00, or ≥3 axes < 1.50 |
+> | At the senior bar | all axes ≥ 1.00, ≥4 axes ≥ 1.75, `tradeoff_articulation` ≥ 1.75 |
+> | At the staff bar | ≥5 axes ≥ 1.75, ≥2 axes ≥ 2.50, `tradeoff_articulation` ≥ 1.75, no axis < 1.00 |
+>
+> Any future mapping must ship with an enumeration test proving it is total and that every
+> row is reachable. That test is cheap and would have caught both defects.
 
 `tradeoff_articulation` is gated at every level deliberately. It is the axis the sources
 converge on hardest: interviewing.io's guide says the interviewer cares less about which
@@ -120,9 +254,9 @@ and warns against extrapolating a whole product from a two-word prompt [IIO-3].
 
 | Band | Observable behaviour |
 | --- | --- |
-| **0** | Began designing from the prompt as given. Never asked what the system must do, never named a non-functional requirement, never bounded the problem. Treated an underspecified prompt as a specification. |
-| **1** | Produced requirements, but they are unquantified ("needs to be fast", "should scale", "must be reliable"), or recited a generic checklist unconnected to this scenario, or only named requirements after being asked twice. Listed eight requirements and prioritised none. Named a nines target with no reasoning about what it costs — interviewing.io reports that unmotivated availability targets read as impostor signal and invite harsher follow-ups [IIO-3]. |
-| **2** | Named the two or three requirements that actually bind for *this* scenario and attached a number or a unit to each (a latency target, a tenant count, a cost ceiling, a recall floor). Stated at least one thing explicitly out of scope. Distinguished what the system must do from how it will be built. |
+| **0** | **Band 0 only if:** no requirement of any kind was stated and the problem was never bounded. Began designing from the prompt as given. Never asked what the system must do, never named a non-functional requirement, never bounded the problem. Treated an underspecified prompt as a specification. |
+| **1** | **Residual — these are worked examples of failing band 2, not tests to check.** Produced requirements, but they are unquantified ("needs to be fast", "should scale", "must be reliable"), or recited a generic checklist unconnected to this scenario, or only named requirements after being asked twice. Listed eight requirements and prioritised none. Named a nines target with no reasoning about what it costs — interviewing.io reports that unmotivated availability targets read as impostor signal and invite harsher follow-ups [IIO-3]. |
+| **2** | **Required:** named the two or three requirements that actually bind for *this* scenario, with a number or a unit on each — a latency target, a tenant count, a cost ceiling, a recall floor. **Indicators:** stated at least one thing explicitly out of scope; distinguished what the system must do from how it will be built; asked rather than assumed. |
 | **3** | All of band 2, **and cut scope in a way that visibly changed the design** — dropped a requirement, relaxed a consistency guarantee, or deferred a feature, and said what the cut bought (a simpler component, a smaller fleet, a latency budget that now closes). Named the requirement they would relax *first* under pressure, before being pushed. Asked the one question whose answer would most change the architecture, rather than a list of safe clarifications. |
 
 **Band-1 trap specific to this cohort:** reciting SLO vocabulary (p99, nines, SLI/SLO/SLA)
@@ -148,9 +282,9 @@ move the design. See [the departure note](#where-this-rubric-departs-from-its-so
 
 | Band | Observable behaviour |
 | --- | --- |
-| **0** | No quantity of any kind, in a scenario whose constraints were stated numerically. Chose between two options whose only real difference is a number, without computing either. |
-| **1** | Gave a number with no derivation, or off by >100× without noticing, or only after being asked twice. Computed something irrelevant (storage for a latency-bound problem). Recited a spec figure — 80GB of HBM, 3.35 TB/s [H100] — without using it in an arithmetic step. Used a number that contradicts a constraint stated in the prompt. Derived the number that decides the question, then proposed a design it rules out (computed 40TB raw, then chose an index that needs all of it resident) — the number was produced but not understood. |
-| **2** | Derived the binding quantity from assumptions stated out loud: request volume × payload, tokens/sec per GPU, KV bytes per token × context length, cost per million tokens. Arithmetic within ~2–3×. **Named which constraint binds** — memory capacity vs memory bandwidth vs compute vs network vs dollars — and showed why the others have slack. |
+| **0** | **Band 0 only if:** no number was engaged at all — neither derived nor quoted from the prompt. The answer would read identically if every number in the prompt were deleted. *(Distinguished from band 1 deliberately: a candidate who quotes the prompt's 400ms target, or recites a spec figure, has engaged a number without producing one, and that is band 1. A reviewer found band 0 and the cap contradicting each other here — the cap says "none of their own", so band 0 cannot also say "no quantity of any kind".)* |
+| **1** | **Residual — these are worked examples of failing band 2, not tests to check.** Gave a number with no derivation, or off by >100× without noticing, or only after being asked twice. Computed something irrelevant (storage for a latency-bound problem). Recited a spec figure — 80GB of HBM, 3.35 TB/s [H100] — without using it in an arithmetic step. Used a number that contradicts a constraint stated in the prompt. Derived the number that decides the question, then proposed a design it rules out (computed 40TB raw, then chose an index that needs all of it resident) — the number was produced but not understood. |
+| **2** | **Required:** named which constraint binds — memory capacity vs memory bandwidth vs compute vs network vs dollars — and supported it with a quantity they derived, arithmetic within ~2–3×. Naming the binding constraint without a number is band 1; a correct number with no statement of what it binds is also band 1. **Indicators:** stated the assumptions out loud; showed why the other constraints have slack; derived from the natural intermediate (request volume × payload, tokens/sec per GPU, KV bytes per token × context, cost per million tokens). |
 | **3** | All of band 2, unprompted, **and the result changed the design**: the number ruled out an architecture, resized a fleet, moved a component, forced an admission-control policy, or revealed that the stated SLO is unachievable at the stated budget — and they said so. Stated assumptions as assumptions and flagged which one the answer is most sensitive to. Rounded in the conservative direction on purpose and said which direction that was. |
 
 **Hard cap, enforced in code, not only in the prompt:** if the candidate produced no
@@ -188,9 +322,9 @@ common reason mid-level candidates fail [HI-D].
 
 | Band | Observable behaviour |
 | --- | --- |
-| **0** | No end-to-end path. Named technologies without connecting them. Could not say what happens to a single request from arrival to response. |
-| **1** | A box diagram that does not satisfy the requirements already stated — serves a latency target the design cannot meet, or ignores a constraint from the prompt. Components named by brand rather than by role, with no reason for the choice; interviewing.io advises naming the generic component rather than the vendor, and warns the obvious follow-up is "why this one and not the other" [IIO-1]. Added a cache, a queue, or a load balancer by reflex with no stated pressure it relieves. |
-| **2** | A design whose request path is traceable end to end and whose components each exist for a stated reason tied to a requirement. The hard part of *this* problem is in the design rather than abstracted away. Read/write paths separated where their shapes differ. Said where state lives and what is stateless. |
+| **0** | **Band 0 only if:** no component was proposed. No end-to-end path. Named technologies without connecting them. Could not say what happens to a single request from arrival to response. |
+| **1** | **Residual — these are worked examples of failing band 2, not tests to check.** A box diagram that does not satisfy the requirements already stated — serves a latency target the design cannot meet, or ignores a constraint from the prompt. Components named by brand rather than by role, with no reason for the choice; interviewing.io advises naming the generic component rather than the vendor, and warns the obvious follow-up is "why this one and not the other" [IIO-1]. Added a cache, a queue, or a load balancer by reflex with no stated pressure it relieves. |
+| **2** | **Required:** a traceable end-to-end path in which the hard part of *this* problem appears as a designed component rather than an abstracted-away box, with each component existing for a reason tied to a stated requirement. **Indicators:** read and write paths separated where their shapes differ; said where state lives and what is stateless; named the component that does the actual work rather than the ones around it. |
 | **3** | All of band 2, **and the design visibly follows from the numbers or the requirement cut** rather than from a template — the component boundary is where it is *because* of a quantity they computed. Named the one component that is the bottleneck and said at what multiple of current load it becomes the bottleneck. Chose the simpler design and said what they gave up, instead of adding a component per concern. |
 
 **Band-1 trap specific to this cohort:** reproducing a reference LLM-serving diagram
@@ -213,9 +347,9 @@ looking for well-reasoned, qualified decisions rather than certainty [IIO-1].
 
 | Band | Observable behaviour |
 | --- | --- |
-| **0** | Stayed at the box-diagram layer for the whole answer. No failure case considered. Overload, eviction, and partial failure never came up even where the prompt made one of them the point. |
-| **1** | Named a failure mode generically and moved on ("we'd add retries", "it'd be highly available", "we'd monitor it"). Proposed retries with no budget, no backoff, and no circuit breaker — a real and common way to convert a brownout into an outage. Went deep on the easy component (the stateless API layer) while leaving the hard one (the scheduler, the cache, the quota ledger) as a box. Treated autoscaling as the answer to an overload question without accounting for the time to add capacity. |
-| **2** | Picked the genuinely hard component and went a level down: the actual eviction policy, the actual queue discipline, where backpressure is applied and what the caller sees when it is, what happens to in-flight work when a node dies. Named a concrete failure mode of *this* design, not of distributed systems in general, and stated the mitigation and its cost. |
+| **0** | **Band 0 only if:** no failure mode was named. Stayed at the box-diagram layer for the whole answer. Overload, eviction, and partial failure never came up even where the prompt made one of them the point. |
+| **1** | **Residual — these are worked examples of failing band 2, not tests to check.** Named a failure mode generically and moved on ("we'd add retries", "it'd be highly available", "we'd monitor it"). Proposed retries with no budget, no backoff, and no circuit breaker — a real and common way to convert a brownout into an outage. Went deep on the easy component (the stateless API layer) while leaving the hard one (the scheduler, the cache, the quota ledger) as a box. Treated autoscaling as the answer to an overload question without accounting for the time to add capacity. |
+| **2** | **Required:** picked the genuinely hard component and named a concrete failure mode of *this* design — not of distributed systems in general — with its mitigation. **Indicators:** went a level down into the actual mechanism (the eviction policy, the queue discipline, where backpressure is applied and what the caller sees); said what happens to in-flight work when a node dies; stated what the mitigation costs. |
 | **3** | All of band 2, unprompted, **and a failure mode they found changed the design** — admission control added because the queue is unbounded, an idempotency key added because the retry path double-charges, a request class isolated because one shape starves another. Named their own design's weakest point before being asked, and said what signal would tell them it is failing in production. Distinguished the degraded mode from the failed mode and said which one they are designing for. |
 
 ---
@@ -234,9 +368,9 @@ as an opportunity to relax a different one [IIO-3].
 
 | Band | Observable behaviour |
 | --- | --- |
-| **0** | No alternative considered. Presented one design as the design. No comparative language anywhere in the answer. |
-| **1** | Listed pros and cons of two options and did not choose — the single most common failure on this axis, and the one the sources call out by name [IIO-1]. Or chose, but justified it with an unfalsifiable claim ("it's more scalable", "it's industry standard", "it's more flexible"). Or named a trade-off that isn't one in this scenario (consistency vs availability where there is one replica). Or chose and then quietly redesigned around the cost they had just acknowledged. |
-| **2** | **Named the axis of the trade-off in units** — latency vs throughput, cost vs tail latency, recall vs p99, consistency vs availability, utilisation vs isolation — stated which side of it this system should sit on and why, given the stated requirement, and acknowledged specifically what the choice gives up. Picked. |
+| **0** | **Band 0 only if:** no alternative was referred to anywhere in the answer. Presented one design as the design. No comparative language anywhere in the answer. |
+| **1** | **Residual — these are worked examples of failing band 2, not tests to check.** Listed pros and cons of two options and did not choose — the single most common failure on this axis, and the one the sources call out by name [IIO-1]. Or chose, but justified it with an unfalsifiable claim ("it's more scalable", "it's industry standard", "it's more flexible"). Or named a trade-off that isn't one in this scenario (consistency vs availability where there is one replica). Or chose and then quietly redesigned around the cost they had just acknowledged. |
+| **2** | **Required:** named **the trade-off that actually binds this decision**, in units — latency vs throughput, cost vs tail latency, recall vs p99, consistency vs availability, utilisation vs isolation — **picked a side, and said what that side gives up.** All three, or it is band 1: an axis named without a decision is the failure the sources call out, a decision with no axis is a preference, and a decision whose cost is never stated is a recommendation rather than a trade-off. *"The trade-off that binds"* excludes one that is true but incidental, recited about a choice the candidate made on other grounds. **Indicators:** justified the side against the stated requirement; named the condition under which they would pick the other side. |
 | **3** | All of band 2, **and the trade-off was resolved against a number they produced**, not against a preference — the batch window is 25ms because the TTFT budget is 400ms and prefill costs X; the index is IVF-PQ because exact search costs Y. Named the condition under which they would reverse the decision ("if long-context share goes above ~20%, this flips"). Volunteered the strongest argument *against* their own choice before the interviewer raised it. |
 
 **Hard cap, enforced in code:** if no trade-off axis was named explicitly,
@@ -263,9 +397,9 @@ defines proactiveness as how far the candidate takes the lead in driving the ses
 
 | Band | Observable behaviour |
 | --- | --- |
-| **0** | Unstructured stream with no stated plan, or near-silence requiring the interviewer to extract every step. The listener cannot tell which phase of the answer they are in. |
-| **1** | Talked continuously without signposting, or over the interviewer's attempt to redirect [HI-D]. Collapsed at the first push — abandoned a correct design because it was questioned, with no attempt to defend it. Or the opposite: repeated the original answer louder, treating the probe as a misunderstanding rather than information. Answered a different, easier question than the one asked and did not acknowledge the substitution. Used jargon with an audience for whom it is the wrong register (brand names, internal shorthand) and did not adjust when it clearly failed to land. |
-| **2** | Stated the shape of the answer before giving it and kept to it. Signposted transitions. Answered the question that was actually asked, inside the time available. On pushback: engaged with the specific objection, either conceded the point and said what changes, or held the position with a reason — not with volume. Matched register to the audience named in the prompt. |
+| **0** | **Band 0 only if:** there was no stated plan and no discernible ordering — an unstructured stream, or near-silence requiring the interviewer to extract every step. The listener cannot tell which phase of the answer they are in. |
+| **1** | **Residual — these are worked examples of failing band 2, not tests to check.** Talked continuously without signposting, or over the interviewer's attempt to redirect [HI-D]. Collapsed at the first push — abandoned a correct design because it was questioned, with no attempt to defend it. Or the opposite: repeated the original answer louder, treating the probe as a misunderstanding rather than information. Answered a different, easier question than the one asked and did not acknowledge the substitution. Used jargon with an audience for whom it is the wrong register (brand names, internal shorthand) and did not adjust when it clearly failed to land. |
+| **2** | **Required:** answered the question that was actually asked, inside the time available — and where the prompt contained pushback, engaged that specific objection, either conceding and saying what changes or holding the position with a reason rather than with volume. **Indicators:** stated the shape of the answer before giving it and kept to it; signposted transitions; matched register to the audience named in the prompt. |
 | **3** | All of band 2, **and the pushback changed something concrete and they said what** — "you're right that the ledger is the bottleneck, so I'm moving the quota check to the gateway and accepting ~1% overdraft." Ran the clock themselves, including saying what they are deliberately not covering and why, which is the proactiveness signal the senior/staff bar is defined by [HI-L]. Surfaced their own uncertainty with its boundary ("I'd want to measure X before committing to this") rather than bluffing fluency. Left the listener able to restate the design and the one decision it rests on. |
 
 **Why this axis carries the product.** It is the axis nobody has ever scored for this
@@ -392,6 +526,18 @@ not cited facts, except where a source key appears. A practitioner reviewer shou
 to check each in under a minute. If any of these is wrong, the model answer teaching the
 judge is wrong, which is worse than a missing number.
 
+> **Four numbers in the first version of this appendix were wrong**, found by four of five
+> simulated reviewers and re-derived before correcting: the KV-vs-node-HBM comparison was
+> off 3.9×, the decode floor omitted KV reads, the prefill estimate omitted attention FLOPs
+> entirely, and the shuffle figure counted writes but not reads. Corrected below with the
+> omitted term shown in each case, because the omission is the teachable part.
+>
+> **Run 2 found that three of those four corrections never left this appendix.** The model
+> answers in `questions.json`, the worked example in `prompts.md`, and one fixture still
+> carried the superseded numbers, and the token-economics paragraph below restated the stale
+> throughput as the corrected one. Appendix B is not the source of truth unless something
+> checks that it propagated: `validate.py` now does.
+
 **Hardware anchors** (H100 SXM, vendor page [H100]): 80GB HBM3, 3.35 TB/s memory
 bandwidth, 900GB/s NVLink GPU-to-GPU, up to 700W TDP. Tensor-core throughput on that page
 is quoted **with sparsity** (BF16 1,979 TFLOPS; FP8 3,958 TFLOPS); dense BF16 is
@@ -402,36 +548,94 @@ possible. H100 NVL for contrast: 94GB, 3.9 TB/s.
 **KV cache per token** = `2 (K,V) × layers × kv_heads × head_dim × bytes_per_element`.
 For a 70B-class model with 80 layers, 8 KV heads under grouped-query attention, head_dim
 128, in bf16: `2 × 80 × 8 × 128 × 2 B = 327,680 B ≈ 320 KB/token`. So 100k tokens of
-context ≈ **32GB of KV for one request** — comparable to a fifth of a node's HBM, which is
-why long-context admission control is a capacity problem and not a tuning problem. For an
-8B-class model (32 layers, 8 KV heads, head_dim 128, bf16): 128 KB/token.
+context ≈ **32.8GB of KV for one request**. On an 8×H100 node (640GB) that is **5.1%** of
+HBM — not "a fifth", as the first version of this file said. The point survives the
+correction and is sharper without the inflation: 5% of a whole node for *one* request, on
+cards already holding weights, is why long-context admission control is a capacity problem
+and not a tuning problem. Against a single card's 80GB it is 41%. For an 8B-class model
+(32 layers, 8 KV heads, head_dim 128, bf16): 128 KB/token.
 
-**Why decode is bandwidth-bound.** A decode step reads every weight once. 70B in bf16 =
-140GB. Across TP=4 H100s, aggregate bandwidth ≈ 4 × 3.35 = 13.4 TB/s, so a step floors at
-≈ 140/13,400 s ≈ **10ms**, i.e. ~100 tokens/sec for a single stream — and that same 10ms
-serves the whole batch. Batch 64 therefore yields ~6,000 tok/s aggregate off the same
-weight read. **That is the entire economic argument for continuous batching**, and it is
-why the inter-token latency a user sees is nearly flat in batch size until compute
-saturates. NVIDIA's benchmarking guidance describes the same shape from the measurement
+**Why decode is bandwidth-bound.** A decode step reads every weight once **and every
+batched sequence's KV cache once** — the second term is the one the first version of this
+file dropped, and it is not small. 70B in bf16 = 140GB of weights. Across TP=4 H100s,
+aggregate bandwidth ≈ 4 × 3.35 = 13.4 TB/s.
+
+- At batch 1, 2k context: KV adds 0.7GB to 140GB, so the step floors at ≈ **10.4ms**,
+  ~96 tokens/sec for a single stream. The weight term dominates completely.
+- At batch 64, 2k context: KV is 64 × 2,000 × 320KB ≈ **41.9GB — 30% of the weight bytes**.
+  The step floors at (140 + 41.9)/13,400 ≈ **13.6ms**, giving **≈ 4,700 tok/s** aggregate,
+  not the ~6,000 the weights-only figure implies.
+
+**The economic argument for continuous batching survives**: one weight read still serves the
+whole batch, which is why a 64× increase in batch costs only ~30% in step time. But the KV
+term is what makes that scaling sub-linear, and it is why inter-token latency drifts upward
+with batch size and context length rather than staying flat. A candidate who quotes the
+weights-only number is at band 2 on the arithmetic; one who notices the KV term is doing
+the thing band 3 describes. NVIDIA's benchmarking guidance describes the same shape from the measurement
 side: system throughput rises with concurrency until the GPU saturates and can then
 decrease [NIM].
 
-**Why prefill is compute-bound.** Prefill ≈ `2 × params × prompt_tokens` FLOPs. A 10k-token
-prompt on 70B = `2 × 70e9 × 1e4` = 1.4 PFLOP; at 4 GPUs × ~990 TFLOPS dense × ~40% achieved
-utilisation ≈ 1.6 PFLOPS, that is **~0.9 seconds**, and a 100k-token prompt is ~9 seconds.
+**Why prefill is compute-bound.** Prefill has two terms, and the first version of this file
+used only the first:
+
+```
+dense     ≈ 2 × params × n                    (the matmuls)
+attention ≈ 2 × n² × d_model × layers         (QK^T and AV, halved for the causal mask)
+```
+
+The two are equal at `n = params / (d_model × layers)` = 70e9 / (8192 × 80) ≈ **106,800
+tokens**. So the dense-only formula is fine for short prompts and wrong by roughly 2× in
+exactly the long-context regime this pack is about. At 4 GPUs × ~990 TFLOPS dense × ~40%
+achieved utilisation ≈ 1.6 PFLOPS:
+
+| Prompt | dense | attention | total | time |
+| --- | --- | --- | --- | --- |
+| 10k tokens | 1.4 PFLOP | 0.13 PFLOP (9%) | 1.53 PFLOP | **~1.0s** |
+| 100k tokens | 14 PFLOP | 13.1 PFLOP (**48%**) | 27.1 PFLOP | **~17s** |
+
+The 100k figure was stated as ~9 seconds. It is **~17 seconds**, and the error made
+long-context prefill look half as damaging as it is.
 This is why a long-context request in the same queue as short ones destroys their
 time-to-first-token, and why TTFT and inter-token latency need separate budgets. NVIDIA
 defines TTFT as including queuing time, prefill, and network latency, and notes longer
 prompts raise it [NIM].
 
 **Token economics.** At an assumed $2/GPU-hour for H100 capacity (a market-rate assumption
-that must be re-verified, not a cited figure), 4 GPUs = $8/hr = $0.0022/sec. At ~6,000
-output tok/s that is ≈ **$0.37 per million output tokens** of raw compute, before
-utilisation losses, redundancy, prefill, and margin. Useful independent reference point:
+that must be re-verified, not a cited figure), 4 GPUs = $8/hr = $0.0022/sec. At the
+KV-corrected **~4,700 output tok/s** derived above — not the ~6,000 the weights-only figure
+implies — that is ≈ **$0.47 per million output tokens** of raw compute, before utilisation
+losses, redundancy, prefill, and margin. At 6,000 it would be $0.37, and four of five
+reviewers in run 2 caught this sentence stating 6,000 while deriving the 4,700 figure: a
+correction announced and not applied is worse than no correction, because it certifies the
+stale number. Useful independent reference point:
 NVIDIA's H100 page cites roughly $0.09 per million tokens for a 120B open model at 66
 tokens/sec/user under vLLM, attributed to a third-party benchmark dated April 2026 [H100].
 Model answers that quote a cost figure state the $/GPU-hour assumption out loud, because
 that is the behaviour the rubric is scoring.
+
+**Shuffle I/O, and which corpus you are shuffling.** A global shuffle reads the corpus once
+and writes it once, so it moves `2 × S`. The first version of this file counted only the
+write. At a sustained 100 GB/s:
+
+| Corpus | bytes moved | time |
+| --- | --- | --- |
+| 4 PB — raw-crawl scale | 8 PB | **~22 h** |
+| 80 TB — tokenised, ~20T tokens at 4 B/token | 160 TB | **~27 min** |
+
+Two things follow, and the second is the one a strong candidate reaches. First, a multi-pass
+external shuffle moves `2 × S` *per pass*, so a two-pass shuffle of 4 PB is ~44 h; "22 hours"
+is a floor, not an estimate. Second, **which corpus is being shuffled decides the answer**,
+and the two rows are three orders of magnitude apart. A petabyte-scale figure belongs to the
+raw crawl; the thing a training run actually reads is the tokenised corpus, which is small
+enough that a per-epoch shuffle is cheap. An answer that reaches for "shuffle once at ingest,
+in-shard thereafter" because it costed the raw crawl has reached the right design through the
+wrong quantity — which the relevance gate does not catch and a numerate interviewer does.
+
+Separately: the token bytes a training fleet reads per step are tiny next to either figure.
+2,000 GPUs at, say, 4k tokens per GPU per step and 4 B/token is ~32 MB a step — the training
+read path is an IOPS and access-pattern problem, not a bandwidth one. Conflating the corpus
+size with the read bandwidth is the most common error in this family, and a simulated
+reviewer made it in run 1 while arguing the opposite point.
 
 **KV cache waste.** vLLM's launch post reports that pre-paging serving systems wasted
 60–80% of KV memory to fragmentation and over-reservation, reduced to under 4% by

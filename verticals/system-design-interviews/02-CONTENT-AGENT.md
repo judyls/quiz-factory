@@ -105,6 +105,34 @@ Expand from the 12 seeds in `01-BUILD-AGENT.md`. Spread across these families:
 - **Retrieval & agents** — 10B-embedding vector search, index refresh, agent orchestration
   fan-out, partial failure
 
+#### Coverage gap found in review, to close in the bank
+
+A simulated reviewer whose domain is training infrastructure **declined to sign the claim
+that the 12-item pack covers AI infrastructure**, and the count supports it: 2 of 12 items
+touch training at all, only 1 is a training-infra design problem, and nothing covers
+distributed training, collective communication, or checkpoint/restart. The 12 seeds lean
+heavily on inference serving and the request path, which is where the cheapest realistic
+scenarios are, not where the field's weight sits.
+
+This is a real limitation of what shipped, not a note for later: the public pages must not
+claim coverage the bank does not have. Either the bank fixes the balance, or the framing
+narrows honestly to inference and serving — which is a defensible product and arguably a
+sharper one.
+
+To fix the balance, the **Training & data** family needs the problems that family is
+actually about, not just its data pipeline:
+
+- a collective-communication problem — all-reduce cost against batch size, where the
+  bandwidth arithmetic decides tensor-vs-data parallelism
+- checkpoint/restart under failure — checkpoint size against write bandwidth and MTBF,
+  where the interval is a derived number and not a config value
+- a straggler or elasticity problem — what a slow or lost node does to a synchronous step
+- gradient accumulation vs microbatching against a memory ceiling
+
+Each is a capacity problem with a binding constraint and a number that moves the design,
+which is what this rubric scores. The absence is a sampling artifact of writing 12 items
+quickly, and it is visible to anyone from that domain.
+
 ### Scenario schema
 
 ```yaml

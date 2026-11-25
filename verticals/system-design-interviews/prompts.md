@@ -286,6 +286,13 @@ Output JSON matching the schema exactly. No prose outside the JSON.
     "<axis_name>": {
       "assessed": true,
       "score": 0,
+      "derivation_steps": [
+        {"inputs": "140 GB weights + 21 GB KV at batch 32 x 2k", "units": "GB",
+         "divisor": "13.4 TB/s aggregate", "op": "(140+21)/13400", "result_stated": "12ms"}
+      ],
+      "terms_present": ["weights", "kv"],
+      "candidate_arithmetic_error": null,
+      "retracted": false,
       "evidence_quote": "verbatim candidate text",
       "evidence_timestamp_ms": 0,
       "addresses_prompt": true,
@@ -321,17 +328,61 @@ only in the prompt is not a cap; this table is the actual anti-flattery mechanis
 | Attribution | `first_raised_by == "interviewer"` ⇒ clamp that axis ≤ 1 |
 | Minimum criticism | fewer than 2 `below_bar_observations` ⇒ reject and re-ask |
 | Axis set | any axis scored that is not in `axes_to_score` ⇒ reject |
-| Contrast provenance | reject if `contrast.at_bar_answer` has higher trigram overlap with the candidate's transcript than with `model_answer` |
+| Contrast coverage | reject if `contrast.at_bar_answer` does not cover at least one beat from `<reference>.good` that the candidate missed, or if it contains a verbatim span of 8+ words from the candidate's transcript |
+| **Grader arithmetic** | every `derivation_steps` entry must recompute from its own stated inputs to within **±5%**, with `units` present on inputs and result. A mismatch means the *grader* wrote arithmetic it did not check ⇒ reject and re-ask. **This check is about the grader, never about the candidate** |
+| **Model completeness** | for any item declaring `required_terms`, the grader reports `terms_present` — which of those terms the candidate's derivation actually contained. A missing term **caps the axis at 2** (an incomplete model cannot be band 3) and is recorded, but **does not reject**. This is the check the first version did not have: all four errors it was written to catch were omitted terms whose arithmetic was internally consistent, so recomputation passed every one of them |
+| **Candidate arithmetic** | where the candidate's own figure does not follow from their own inputs, the grader sets `candidate_arithmetic_error` with the recomputation and **scores the band accordingly** — >100× unnoticed is band 1, within ~2–3× is band 2. It must **never** reject. A validator that fails the grader for a candidate's bad arithmetic is unsatisfiable on exactly the transcripts the rubric most needs to score, and the first thing an on-call engineer does with an unsatisfiable gate is switch it off |
+| Numeric consistency | reject a `band3_consequence` whose threshold or conclusion contradicts the candidate's own figures elsewhere in the transcript |
 | Versioning | `grader_version` stamped on every row, always |
 
 **Reject-and-re-ask, not repair.** Silently clamping a bad output teaches nothing and hides
 how often the grader misses. Log every rejection with its reason; the rejection rate per
 check is a live quality signal and belongs in `METRICS.md`.
 
+### Why `required_terms` and not a tighter recomputation
+
+The four arithmetic errors this pack has found in its own material were all the same shape:
+a formula missing a term, applied correctly. `140/13,400` is exactly 10.4ms — the arithmetic
+is flawless and the model is wrong, because a decode step also reads the batch's KV. Same
+for prefill without the attention term, and a shuffle counting writes but not reads.
+
+No recomputation check can catch that, because there is nothing to recompute incorrectly.
+What catches it is knowing, per item, which terms a complete derivation contains — so each
+item that has a load-bearing derivation declares `required_terms`, and the grader reports
+which were present. A candidate who omits one is not wrong about arithmetic; they are
+working with an incomplete model, which is the difference between band 2 and band 3 on
+`capacity_cost_estimation`, and the cap encodes exactly that.
+
+### Two things the first version of this table could not do
+
+Both found by simulated reviewers, and both were holes rather than bugs.
+
+1. **It enforced the *form* of a number and never its *truth*.** A candidate could state a
+   threshold with no derivation, contradicting their own figures, and pass every row with a
+   clean `band3_consequence`. That is exactly how one of the pack's own adversarial plants
+   got written with circular arithmetic and expected to score band 3. Hence
+   `derivation_steps` and the two numeric rows above: a quantity that earns a 2 or a 3 must
+   recompute in code.
+2. **The contrast-provenance check was theatre.** Trigram overlap against `model_answer` is
+   structurally rigged to pass (the contrast is *generated from* `model_answer`), blind to
+   the failure that matters — copying the candidate's *conclusions* rather than their
+   wording — and it false-fires on the strongest candidates, whose answers legitimately
+   resemble the reference. Replaced with required-beat coverage plus a verbatim-span check,
+   which tests the thing the row was supposed to protect.
+
+### Aggregation is not the grader's job
+
+The grader emits **per-item, per-axis** scores and nothing else. Combining the 4 items that
+score an axis into one axis score is **code**, by the rule in `rubric.md`
+(mean of assessed items, continuous, never re-rounded to a band). The grader must never see
+or emit an aggregate, a composite, a percentile, or a level claim — a model that knows the
+level it is about to produce will grade toward it.
+
 **The 12 plants in `calibration-plants.json` are the test suite for this prompt.** Each has
 a required outcome. Run all 12 on every material prompt change; a failed plant is a defect,
-not a score. Plant 08b in particular tests that the relevance gate does not over-fire — the
-other eleven only test harshness, so without it a gate that clamps everything passes.
+not a score. The set includes a **negative control** for the relevance gate — the others
+only test harshness, so without it a gate that clamps everything would pass the suite.
+Which fixture that is stays in the plants file: naming it here de-blinds reviewers.
 
 ---
 
